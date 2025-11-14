@@ -25,31 +25,9 @@ spec:
         - containerPort: 8080
           name: webserver-port
 
-        env:
-        - name: AIRFLOW__CORE__EXECUTOR
-          value: "CeleryExecutor"
-        # - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-        #   value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
-        # - name: AIRFLOW__CELERY__RESULT_BACKEND
-        #   value: "db+postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
-        - name: AIRFLOW__CELERY__BROKER_URL
-          value: "redis://:@redis-service.nexusml.svc.cluster.local:6379/0"
-        - name: AIRFLOW__CORE__FERNET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: airflow-secret
-              key: FERNET_KEY
-        - name: AIRFLOW__CORE__LOAD_EXAMPLES
-          value: "false"
-        - name: AIRFLOW__API__AUTH_BACKENDS
-          value: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-        - name: AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK
-          value: "true"
-
         envFrom:
         - secretRef:
-            name: postgres-secret
-
+            name: airflow-secret
         volumeMounts:
         - name: airflow-dags
           mountPath: /opt/airflow/dags

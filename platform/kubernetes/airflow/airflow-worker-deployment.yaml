@@ -13,33 +13,16 @@ spec:
       labels:
         app: airflow-worker
     spec:
+      securityContext:
+        runAsUser: 50000
+        runAsGroup: 0
       containers:
       - name: airflow-worker
         image: nbngoc1303/airflow-image # Using the same image as in docker-compose, or a custom one if built
         imagePullPolicy: IfNotPresent
-        command: ["airflow", "celery", "worker"]
-        env:
-        - name: AIRFLOW__CORE__EXECUTOR
-          value: "CeleryExecutor"
-        # - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-        #   value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
-        # - name: AIRFLOW__CELERY__RESULT_BACKEND
-        #   value: "db+postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
-        - name: AIRFLOW__CELERY__BROKER_URL
-          value: "redis://:@redis-service.nexusml.svc.cluster.local:6379/0"
-        - name: AIRFLOW__CORE__FERNET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: airflow-secret # Assuming an Airflow secret will be created
-              key: FERNET_KEY
-        - name: AIRFLOW__CORE__LOAD_EXAMPLES
-          value: "false"
-        - name: AIRFLOW__API__AUTH_BACKENDS
-          value: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-        # Pass the PostgreSQL password from the secret
         envFrom:
         - secretRef:
-            name: postgres-secret
+            name: airflow-secret
         # Mount volumes for dags, logs, config, plugins
         volumeMounts:
         - name: airflow-dags
@@ -50,13 +33,6 @@ spec:
           mountPath: /opt/airflow/config
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
-
-        resources:
-          requests:
-            memory: "1Gi"
-          limits:
-            memory: "2Gi"
-            
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
@@ -70,6 +46,8 @@ spec:
       - name: airflow-plugins
         persistentVolumeClaim:
           claimName: airflow-plugins-pvc # Assuming a PVC for plugins will be created
-      securityContext:
-        runAsUser: 50000 # Matches AIRFLOW_UID from docker-compose
-        runAsGroup: 0
+      resources:
+        requests:
+          memory: "1Gi"
+        limits:
+          memory: "2.5Gi"
