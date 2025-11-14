@@ -53,12 +53,12 @@ spec:
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
         resources:
-        requests:
-          memory: "1Gi"
-          cpu: "500m"
-        limits:
-          memory: "1.5Gi" # Tăng giới hạn RAM
-          cpu: "1000m"
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "1.5Gi" # Tăng giới hạn RAM
+            cpu: "1000m"
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
