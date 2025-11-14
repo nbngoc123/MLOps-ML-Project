@@ -20,6 +20,7 @@ spec:
       - name: airflow-triggerer
         image: nbngoc1303/airflow-image
         imagePullPolicy: IfNotPresent
+        command: ["airflow", "triggerer"]
         envFrom:
         - secretRef:
             name: airflow-secret

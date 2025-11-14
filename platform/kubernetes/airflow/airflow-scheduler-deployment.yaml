@@ -20,6 +20,7 @@ spec:
       - name: airflow-scheduler
         image: nbngoc1303/airflow-image
         imagePullPolicy: IfNotPresent
+        command: ["airflow", "scheduler"]
         envFrom:
         - secretRef:
             name: airflow-secret

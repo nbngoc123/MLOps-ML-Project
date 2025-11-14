@@ -20,6 +20,7 @@ spec:
       - name: airflow-worker
         image: nbngoc1303/airflow-image
         imagePullPolicy: IfNotPresent
+        command: ["airflow", "celery", "worker"]
         envFrom:
         - secretRef:
             name: airflow-secret
