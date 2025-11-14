@@ -103,13 +103,7 @@ spec:
         args:
           - |
             airflow db migrate && \
-            airflow users create \
-              --username admin \
-              --firstname Admin \
-              --lastname User \
-              --role Admin \
-              --email admin@example.com \
-              --password admin
+            # ĐÃ XÓA LỆNH: airflow users create vì Job đã thực hiện thành công
         volumeMounts:
         - name: airflow-dags
           mountPath: /opt/airflow/dags
