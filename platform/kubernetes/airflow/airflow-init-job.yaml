@@ -55,6 +55,15 @@ spec:
               --role Admin \
               --email admin@example.com \
               --password admin
+              
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "1.5Gi" 
+            cpu: "1000m"
+
       restartPolicy: Never # Job should not restart if it fails, it should be handled by the user
       volumes:
       - name: airflow-dags

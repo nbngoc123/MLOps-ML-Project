@@ -50,6 +50,15 @@ spec:
           mountPath: /opt/airflow/config
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
