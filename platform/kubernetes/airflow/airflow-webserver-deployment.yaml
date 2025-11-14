@@ -102,7 +102,7 @@ spec:
         command: ["/bin/bash", "-c"]
         args:
           - |
-            airflow db migrate && \
+            airflow db migrate
             # ĐÃ XÓA LỆNH: airflow users create vì Job đã thực hiện thành công
         volumeMounts:
         - name: airflow-dags
