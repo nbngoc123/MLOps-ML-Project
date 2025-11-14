@@ -36,8 +36,10 @@ spec:
         resources:
           requests:
             memory: "512Mi"
+            cpu: "200m"
           limits:
             memory: "1Gi"
+            cpu: "500m"
       volumes:
       - name: minio-data
         persistentVolumeClaim:

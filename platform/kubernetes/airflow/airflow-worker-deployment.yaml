@@ -4,7 +4,7 @@ metadata:
   name: airflow-worker
   namespace: nexusml # Assuming a namespace for the project
 spec:
-  replicas: 3 # Scalable number of workers
+  replicas: 1 # Scalable number of workers
   selector:
     matchLabels:
       app: airflow-worker
