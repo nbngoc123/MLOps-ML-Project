@@ -21,10 +21,10 @@ spec:
         env:
         - name: AIRFLOW__CORE__EXECUTOR
           value: "CeleryExecutor"
-        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-          value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
-        - name: AIRFLOW__CELERY__RESULT_BACKEND
-          value: "db+postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        # - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+        #   value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        # - name: AIRFLOW__CELERY__RESULT_BACKEND
+        #   value: "db+postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
         - name: AIRFLOW__CELERY__BROKER_URL
           value: "redis://:@redis-service.nexusml.svc.cluster.local:6379/0"
         - name: AIRFLOW__CORE__FERNET_KEY
