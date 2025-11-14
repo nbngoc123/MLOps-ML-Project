@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: airflow-worker
-  namespace: nexusml # Assuming a namespace for the project
+  namespace: nexusml
 spec:
-  replicas: 1 # Scalable number of workers
+  replicas: 2
   selector:
     matchLabels:
       app: airflow-worker
@@ -18,12 +18,11 @@ spec:
         runAsGroup: 0
       containers:
       - name: airflow-worker
-        image: nbngoc1303/airflow-image # Using the same image as in docker-compose, or a custom one if built
+        image: nbngoc1303/airflow-image
         imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
             name: airflow-secret
-        # Mount volumes for dags, logs, config, plugins
         volumeMounts:
         - name: airflow-dags
           mountPath: /opt/airflow/dags
@@ -36,18 +35,13 @@ spec:
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
-          claimName: airflow-dags-pvc # Assuming a PVC for dags will be created
+          claimName: airflow-dags-pvc
       - name: airflow-logs
         persistentVolumeClaim:
-          claimName: airflow-logs-pvc # Assuming a PVC for logs will be created
+          claimName: airflow-logs-pvc
       - name: airflow-config
         persistentVolumeClaim:
-          claimName: airflow-config-pvc # Assuming a PVC for config will be created
+          claimName: airflow-config-pvc
       - name: airflow-plugins
         persistentVolumeClaim:
-          claimName: airflow-plugins-pvc # Assuming a PVC for plugins will be created
-      resources:
-        requests:
-          memory: "1Gi"
-        limits:
-          memory: "2.5Gi"
+          claimName: airflow-plugins-pvc

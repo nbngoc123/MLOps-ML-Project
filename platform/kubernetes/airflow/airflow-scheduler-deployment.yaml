@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: airflow-scheduler
-  namespace: nexusml # Assuming a namespace for the project
+  namespace: nexusml
 spec:
-  replicas: 1 # Typically one scheduler replica is sufficient, but can be scaled
+  replicas: 1
   selector:
     matchLabels:
       app: airflow-scheduler
@@ -13,15 +13,16 @@ spec:
       labels:
         app: airflow-scheduler
     spec:
+      securityContext:
+        runAsUser: 50000
+        runAsGroup: 0
       containers:
       - name: airflow-scheduler
-        image: nbngoc1303/airflow-image # Using the same image as in docker-compose, or a custom one if built
+        image: nbngoc1303/airflow-image
         imagePullPolicy: IfNotPresent
-        command: ["airflow", "scheduler"]
         envFrom:
         - secretRef:
             name: airflow-secret
-        # Mount volumes for dags, logs, config, plugins
         volumeMounts:
         - name: airflow-dags
           mountPath: /opt/airflow/dags
@@ -31,26 +32,16 @@ spec:
           mountPath: /opt/airflow/config
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
-      resources:
-        requests:
-          memory: "1Gi"
-          cpu: "500m"
-        limits:
-          memory: "2.5Gi"
-          cpu: "1000m"
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
-          claimName: airflow-dags-pvc # Assuming a PVC for dags will be created
+          claimName: airflow-dags-pvc
       - name: airflow-logs
         persistentVolumeClaim:
-          claimName: airflow-logs-pvc # Assuming a PVC for logs will be created
+          claimName: airflow-logs-pvc
       - name: airflow-config
         persistentVolumeClaim:
-          claimName: airflow-config-pvc # Assuming a PVC for config will be created
+          claimName: airflow-config-pvc
       - name: airflow-plugins
         persistentVolumeClaim:
-          claimName: airflow-plugins-pvc # Assuming a PVC for plugins will be created
-      securityContext:
-        runAsUser: 50000 # Matches AIRFLOW_UID from docker-compose
-        runAsGroup: 0
+          claimName: airflow-plugins-pvc

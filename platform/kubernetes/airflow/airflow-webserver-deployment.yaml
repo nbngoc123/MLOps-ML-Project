@@ -16,7 +16,6 @@ spec:
       securityContext:
         runAsUser: 50000
         runAsGroup: 0
-
       containers:
       - name: airflow-webserver
         image: nbngoc1303/airflow-image
@@ -24,7 +23,6 @@ spec:
         ports:
         - containerPort: 8080
           name: webserver-port
-
         envFrom:
         - secretRef:
             name: airflow-secret
@@ -37,7 +35,6 @@ spec:
           mountPath: /opt/airflow/config
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
-
         resources:
           requests:
             memory: "1Gi"
@@ -45,7 +42,6 @@ spec:
           limits:
             memory: "2.5Gi"
             cpu: "1000m"
-
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
