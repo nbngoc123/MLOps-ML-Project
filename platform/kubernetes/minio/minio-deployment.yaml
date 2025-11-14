@@ -33,6 +33,11 @@ spec:
         volumeMounts:
         - name: minio-data
           mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+          limits:
+            memory: "1Gi"
       volumes:
       - name: minio-data
         persistentVolumeClaim:

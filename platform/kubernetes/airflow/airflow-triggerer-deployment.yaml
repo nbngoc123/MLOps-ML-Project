@@ -55,11 +55,9 @@ spec:
 
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "100m"
+            memory: "1Gi"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "1.5Gi"
             
       volumes:
       - name: airflow-dags
