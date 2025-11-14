@@ -4,7 +4,7 @@ metadata:
   name: airflow-worker
   namespace: nexusml
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: airflow-worker
@@ -33,6 +33,15 @@ spec:
           mountPath: /opt/airflow/config
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+
+            
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:
