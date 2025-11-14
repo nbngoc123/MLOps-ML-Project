@@ -60,7 +60,7 @@ spec:
             memory: "1Gi"
             cpu: "500m"
           limits:
-            memory: "1.5Gi" # Đủ lớn để chạy db migrate
+            memory: "2.5Gi" # Đủ lớn để chạy db migrate
             cpu: "1000m"
             
       volumes:
