@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-configmap
+  namespace: nexusml # Assuming a namespace for the project
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s # How frequently to scrape targets
+      evaluation_interval: 15s # How frequently to evaluate rules
+
+    scrape_configs:
+      # Scrape Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Scrape Airflow components (webserver, scheduler, worker, triggerer)
+      # These will need to be exposed as Services in Kubernetes
+      - job_name: 'airflow-webserver'
+        static_configs:
+          - targets: ['airflow-webserver-service.nexusml.svc.cluster.local:8080'] # Assuming webserver service is available
+
+      - job_name: 'airflow-scheduler'
+        static_configs:
+          - targets: ['airflow-scheduler-service.nexusml.svc.cluster.local:8974'] # Assuming scheduler health check endpoint is available
+
+      # Add other Airflow components if they expose metrics
+
+      # Scrape MLflow (if it exposes metrics)
+      - job_name: 'mlflow'
+        static_configs:
+          - targets: ['mlflow-service.nexusml.svc.cluster.local:5000'] # Assuming MLflow service is available
+
+      # Scrape Jenkins (if it exposes metrics)
+      - job_name: 'jenkins'
+        static_configs:
+          - targets: ['jenkins-service.nexusml.svc.cluster.local:8080'] # Assuming Jenkins service is available
+
+      # Scrape PostgreSQL (if it exposes metrics, e.g., via a postgres_exporter)
+      # - job_name: 'postgres'
+      #   static_configs:
+      #     - targets: ['postgres-exporter-service.nexusml.svc.cluster.local:9187'] # Example for postgres_exporter
+
+      # Scrape Redis (if it exposes metrics, e.g., via a redis_exporter)
+      # - job_name: 'redis'
+      #   static_configs:
+      #     - targets: ['redis-exporter-service.nexusml.svc.cluster.local:9121'] # Example for redis_exporter
+
+      # Scrape Kafka (if it exposes metrics, e.g., via a kafka_exporter or JMX exporter)
+      # - job_name: 'kafka'
+      #   static_configs:
+      #     - targets: ['kafka-service.nexusml.svc.cluster.local:9092'] # Kafka itself might not expose Prometheus metrics directly
+
+    # Add alerting rules here if needed
+    # alerting:
+    #   alertmanagers:
+    #   - static_configs:
+    #     - targets:
+    #       - alertmanager-service.nexusml.svc.cluster.local:9094

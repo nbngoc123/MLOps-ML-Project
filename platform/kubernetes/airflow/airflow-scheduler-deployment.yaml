@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  replicas: 1 # Typically one scheduler replica is sufficient, but can be scaled
+  selector:
+    matchLabels:
+      app: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: airflow-scheduler
+    spec:
+      containers:
+      - name: airflow-scheduler
+        image: airflow-image:latest # Using the same image as in docker-compose, or a custom one if built
+        imagePullPolicy: IfNotPresent
+        command: ["airflow", "scheduler"]
+        env:
+        - name: AIRFLOW__CORE__EXECUTOR
+          value: "CeleryExecutor"
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CELERY__RESULT_BACKEND
+          value: "db+postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CELERY__BROKER_URL
+          value: "redis://:@redis-service.nexusml.svc.cluster.local:6379/0"
+        - name: AIRFLOW__CORE__FERNET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airflow-secret # Assuming an Airflow secret will be created
+              key: FERNET_KEY
+        - name: AIRFLOW__CORE__LOAD_EXAMPLES
+          value: "false"
+        - name: AIRFLOW__API__AUTH_BACKENDS
+          value: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+        - name: AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK
+          value: "true"
+        # Pass the PostgreSQL password from the secret
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        # Mount volumes for dags, logs, config, plugins
+        volumeMounts:
+        - name: airflow-dags
+          mountPath: /opt/airflow/dags
+        - name: airflow-logs
+          mountPath: /opt/airflow/logs
+        - name: airflow-config
+          mountPath: /opt/airflow/config
+        - name: airflow-plugins
+          mountPath: /opt/airflow/plugins
+      volumes:
+      - name: airflow-dags
+        persistentVolumeClaim:
+          claimName: airflow-dags-pvc # Assuming a PVC for dags will be created
+      - name: airflow-logs
+        persistentVolumeClaim:
+          claimName: airflow-logs-pvc # Assuming a PVC for logs will be created
+      - name: airflow-config
+        persistentVolumeClaim:
+          claimName: airflow-config-pvc # Assuming a PVC for config will be created
+      - name: airflow-plugins
+        persistentVolumeClaim:
+          claimName: airflow-plugins-pvc # Assuming a PVC for plugins will be created
+      securityContext:
+        runAsUser: 50000 # Matches AIRFLOW_UID from docker-compose
+        runAsGroup: 0

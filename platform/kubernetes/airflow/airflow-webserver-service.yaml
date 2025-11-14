@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-service
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  selector:
+    app: airflow-webserver # Matches the labels in the Deployment template
+  ports:
+  - protocol: TCP
+    port: 8080 # Port Airflow webserver listens on
+    targetPort: 8080
+    name: webserver-port
+  type: ClusterIP # Default type, accessible within the cluster

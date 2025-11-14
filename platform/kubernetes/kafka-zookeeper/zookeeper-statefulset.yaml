@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  serviceName: zookeeper-service
+  replicas: 3 # Recommended for Zookeeper for HA
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+      - name: zookeeper
+        image: confluentinc/cp-zookeeper:latest # Using the same image as in docker-compose
+        ports:
+        - containerPort: 2181
+          name: client
+        env:
+        - name: ZOOKEEPER_CLIENT_PORT
+          value: "2181"
+        # Zookeeper requires a unique ID for each instance in a StatefulSet
+        # This can be achieved using the pod's hostname
+        - name: ZOOKEEPER_MYID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name # e.g., zookeeper-0, zookeeper-1
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /var/lib/zookeeper/data
+        - name: zookeeper-log
+          mountPath: /var/lib/zookeeper/log
+  volumeClaimTemplates:
+  - metadata:
+      name: zookeeper-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi # Adjust storage size as needed
+  # For log data, it's often sufficient to use emptyDir or a separate PVC if needed for long-term analysis
+  # For simplicity here, we'll use an emptyDir, but a PVC could be used for persistent logs.
+  - metadata:
+      name: zookeeper-log
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

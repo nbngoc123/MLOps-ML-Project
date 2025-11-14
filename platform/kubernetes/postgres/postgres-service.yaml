@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  selector:
+    app: postgres # Matches the labels in the StatefulSet template
+  ports:
+  - protocol: TCP
+    port: 5432 # Default PostgreSQL port
+    targetPort: 5432
+    name: postgres-port
+  # For a StatefulSet, a headless service is often used for DNS discovery of individual pods.
+  # If you need a stable ClusterIP for external access or simpler internal access,
+  # you would remove clusterIP: None. For internal service-to-service communication,
+  # the headless service is usually sufficient.
+  clusterIP: None

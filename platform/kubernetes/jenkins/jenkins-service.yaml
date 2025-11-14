@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-service
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  selector:
+    app: jenkins # Matches the labels in the StatefulSet template
+  ports:
+  - protocol: TCP
+    port: 8080 # Port Jenkins listens on
+    targetPort: 8080
+    name: jenkins-http
+  # For external access, you might want to use a LoadBalancer service type or an Ingress.
+  # For internal cluster access, ClusterIP is sufficient.
+  type: ClusterIP

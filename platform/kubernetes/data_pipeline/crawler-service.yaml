@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-pipeline-crawler-service
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  selector:
+    app: data-pipeline-crawler # Matches the labels in the Deployment template
+  ports:
+  - protocol: TCP
+    port: 80 # Assuming crawler might expose an HTTP endpoint for status or control
+    targetPort: 80
+    name: crawler-port
+  clusterIP: None # Headless service for StatefulSet discovery (though crawler is a Deployment, a headless service can help with discovery if needed)

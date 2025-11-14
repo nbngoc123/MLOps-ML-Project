@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-webserver
+  template:
+    metadata:
+      labels:
+        app: airflow-webserver
+    spec:
+      containers:
+      - name: airflow-webserver
+        image: airflow-image:latest # Using the same image as in docker-compose, or a custom one if built
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: webserver-port
+        env:
+        - name: AIRFLOW__CORE__EXECUTOR
+          value: "CeleryExecutor"
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CELERY__RESULT_BACKEND
+          value: "db+postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CELERY__BROKER_URL
+          value: "redis://:@redis-service.nexusml.svc.cluster.local:6379/0"
+        - name: AIRFLOW__CORE__FERNET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airflow-secret # Assuming an Airflow secret will be created
+              key: FERNET_KEY
+        - name: AIRFLOW__CORE__LOAD_EXAMPLES
+          value: "false"
+        - name: AIRFLOW__API__AUTH_BACKENDS
+          value: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+        - name: AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK
+          value: "true"
+        # Pass the PostgreSQL password from the secret
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        # Mount volumes for dags, logs, config, plugins
+        volumeMounts:
+        - name: airflow-dags
+          mountPath: /opt/airflow/dags
+        - name: airflow-logs
+          mountPath: /opt/airflow/logs
+        - name: airflow-config
+          mountPath: /opt/airflow/config
+        - name: airflow-plugins
+          mountPath: /opt/airflow/plugins
+      volumes:
+      - name: airflow-dags
+        persistentVolumeClaim:
+          claimName: airflow-dags-pvc # Assuming a PVC for dags will be created
+      - name: airflow-logs
+        persistentVolumeClaim:
+          claimName: airflow-logs-pvc # Assuming a PVC for logs will be created
+      - name: airflow-config
+        persistentVolumeClaim:
+          claimName: airflow-config-pvc # Assuming a PVC for config will be created
+      - name: airflow-plugins
+        persistentVolumeClaim:
+          claimName: airflow-plugins-pvc # Assuming a PVC for plugins will be created
+      # Ensure the init job completes before the webserver starts
+      # This is typically handled by a Job's completion status, but can also be managed with initContainers or readiness probes.
+      # For simplicity, we rely on the Job completing first.
+      # The docker-compose used 'depends_on' with 'service_completed_successfully' for airflow-init.
+      # In Kubernetes, this is often managed by ensuring the Job runs and completes before deploying Deployments that depend on it.
+      # A more robust approach might involve an initContainer or a custom controller.
+      # For now, we assume the init job will be applied first.
+      initContainers:
+      - name: airflow-init-container
+        image: apache/airflow:2.10.3 # Same image
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        env:
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "postgresql+psycopg2://postgres:$(POSTGRES_PASSWORD)@postgres-service.nexusml.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CELERY__BROKER_URL
+          value: "redis://:@redis-service.nexusml.svc.cluster.local:6379/0"
+        - name: AIRFLOW__CORE__FERNET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airflow-secret
+              key: FERNET_KEY
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            airflow db migrate && \
+            airflow users create \
+              --username admin \
+              --firstname Admin \
+              --lastname User \
+              --role Admin \
+              --email admin@example.com \
+              --password admin
+        volumeMounts:
+        - name: airflow-dags
+          mountPath: /opt/airflow/dags
+        - name: airflow-logs
+          mountPath: /opt/airflow/logs
+        - name: airflow-config
+          mountPath: /opt/airflow/config
+        - name: airflow-plugins
+          mountPath: /opt/airflow/plugins
+      securityContext:
+        runAsUser: 50000 # Matches AIRFLOW_UID from docker-compose
+        runAsGroup: 0

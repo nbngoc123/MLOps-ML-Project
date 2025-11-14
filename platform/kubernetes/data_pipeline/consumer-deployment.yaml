@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-pipeline-consumer
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  replicas: 1 # Adjust as needed
+  selector:
+    matchLabels:
+      app: data-pipeline-consumer
+  template:
+    metadata:
+      labels:
+        app: data-pipeline-consumer
+    spec:
+      containers:
+      - name: consumer
+        image: your-docker-repo/data-pipeline-consumer:latest # Replace with actual image name
+        command: ["python", "-m", "consumer.main"] # Command to run the consumer
+        env:
+        # Add environment variables needed for the consumer
+        # e.g., Kafka broker address, topic name, PostgreSQL connection details
+        - name: KAFKA_BROKERS
+          value: "kafka-service.nexusml.svc.cluster.local:9092"
+        - name: KAFKA_TOPIC
+          value: "image-raw-data"
+        - name: POSTGRES_HOST
+          value: "postgres-service.nexusml.svc.cluster.local"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "image_db"
+        envFrom:
+        - secretRef:
+            name: postgres-secret # Reference to the PostgreSQL secret
+        # Add other necessary environment variables or config mounts
+      # If the consumer needs persistent storage (e.g., for processed data before DB commit), add volumes here
+      # volumes:
+      # - name: consumer-storage
+      #   persistentVolumeClaim:
+      #     claimName: consumer-storage-pvc

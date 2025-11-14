@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-pipeline-backend
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  replicas: 1 # Adjust as needed
+  selector:
+    matchLabels:
+      app: serving-pipeline-backend
+  template:
+    metadata:
+      labels:
+        app: serving-pipeline-backend
+    spec:
+      containers:
+      - name: backend
+        image: your-docker-repo/serving-pipeline-backend:latest # Replace with actual image name
+        ports:
+        - containerPort: 8000 # Assuming backend runs on port 8000
+          name: backend-port
+        env:
+        # Add environment variables needed for the backend
+        # e.g., database connection strings, API keys, etc.
+        # These should ideally come from Secrets or ConfigMaps
+        - name: POSTGRES_HOST
+          value: "postgres-service.nexusml.svc.cluster.local"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: "image_db"
+        envFrom:
+        - secretRef:
+            name: postgres-secret # Reference to the PostgreSQL secret
+        # Add other necessary environment variables or config mounts
+      # If the backend needs persistent storage, add volumes here
+      # volumes:
+      # - name: backend-storage
+      #   persistentVolumeClaim:
+      #     claimName: backend-storage-pvc

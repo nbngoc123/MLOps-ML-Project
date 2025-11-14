@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-pipeline-frontend
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  replicas: 1 # Adjust as needed
+  selector:
+    matchLabels:
+      app: serving-pipeline-frontend
+  template:
+    metadata:
+      labels:
+        app: serving-pipeline-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: your-docker-repo/serving-pipeline-frontend:latest # Replace with actual image name
+        ports:
+        - containerPort: 3000 # Assuming frontend runs on port 3000
+          name: frontend-port
+        env:
+        # Add environment variables needed for the frontend
+        # e.g., API endpoint URL
+        - name: REACT_APP_API_URL
+          value: "http://serving-pipeline-backend-service.nexusml.svc.cluster.local:8000" # Point to the backend service
+      # If the frontend needs persistent storage (e.g., for caching), add volumes here
+      # volumes:
+      # - name: frontend-storage
+      #   persistentVolumeClaim:
+      #     claimName: frontend-storage-pvc

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-worker-service
+  namespace: nexusml # Assuming a namespace for the project
+spec:
+  selector:
+    app: airflow-worker # Matches the labels in the Deployment template
+  ports:
+  - protocol: TCP
+    port: 5555 # Default port for Celery workers to communicate
+    targetPort: 5555
+    name: celery-worker-port
+  clusterIP: None # Headless service for StatefulSet discovery (though workers are Deployments, a headless service can help with discovery if needed)
