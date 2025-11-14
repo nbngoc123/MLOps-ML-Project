@@ -8,7 +8,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi # Adjust storage size as needed for DAGs
+      storage: 3Gi # Adjust storage size as needed for DAGs
 
 ---
 apiVersion: v1
@@ -21,7 +21,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi # Adjust storage size as needed for logs
+      storage: 3Gi # Adjust storage size as needed for logs
 
 ---
 apiVersion: v1
@@ -34,7 +34,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi # Adjust storage size as needed for config
+      storage: 3Gi # Adjust storage size as needed for config
 
 ---
 apiVersion: v1
@@ -47,4 +47,4 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi # Adjust storage size as needed for plugins
+      storage: 3Gi # Adjust storage size as needed for plugins

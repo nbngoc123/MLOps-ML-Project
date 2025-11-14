@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: airflow-worker
-        image: airflow-image:latest # Using the same image as in docker-compose, or a custom one if built
+        image: nbngoc1303/airflow-image # Using the same image as in docker-compose, or a custom one if built
         imagePullPolicy: IfNotPresent
         command: ["airflow", "celery", "worker"]
         env:

@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
       - name: mlflow
-        image: mlflow-image:latest
-        imagePullPolicy: Never 
+        image: nbngoc1303/mlflow-image
+        imagePullPolicy: IfNotPresent 
         
         command: [
           "mlflow",
