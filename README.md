@@ -1,4 +1,4 @@
-# NexusML – A Simple MLOps Framework
+# Template NexusML – A Simple MLOps Framework
 
 ## Overview
 
@@ -33,7 +33,7 @@ This project aims to provide a generalized MLOps solution that supports various 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/ThuanNaN/NexusML.git
+git clone https://github.com/nbngoc123/MLOps-ML-Project.git
 
 git submodule update --init --recursive
 ```
@@ -45,22 +45,3 @@ git submodule update --init --recursive
 - [ ] Continuous Monitoring
 - [ ] CI/CD for MLOps
 - [ ] Scalability & Flexibility
-
-## Contributions
-
-Contributions are welcome! Feel free to open an issue or submit a pull request to improve NexusML.
-
-## License
-
-MIT License – Free to use and modify for any project.
-
-
-
-git submodule update --init --recursive
-
-jenkins: 44129f95515a48d3a0ceb3790b3136b7
-jenkins - aivn2025
-
-ngrok: 19522312@gm.uit.edu.vn
-url: https://known-husky-allegedly.ngrok-free.app
-plugin: 
