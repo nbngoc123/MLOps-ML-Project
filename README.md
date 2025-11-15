@@ -45,3 +45,20 @@ git submodule update --init --recursive
 - [ ] Continuous Monitoring
 - [ ] CI/CD for MLOps
 - [ ] Scalability & Flexibility
+
+## Contributions
+
+- Create new local branch
+
+```bash
+git checkout -b <ten branch> 
+```
+- Do anymore
+
+```bash
+git branch -a
+git pull origin <branch hien tai>
+git add .
+git commit -m 'commit'
+git push origin <branch hien tai>
+```
