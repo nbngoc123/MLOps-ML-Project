@@ -23,7 +23,7 @@ spec:
         ports:
         - containerPort: 8080
           name: webserver-port
-        command: ["airflow", "api-serve"]
+        command: ["airflow", "api-server"]
         envFrom:
         - secretRef:
             name: airflow-secret
