@@ -15,27 +15,20 @@ data:
         static_configs:
           - targets: ['localhost:9090']
 
-      # Scrape Airflow components (webserver, scheduler, worker, triggerer)
-      # These will need to be exposed as Services in Kubernetes
+      # Scrape Airflow Webserver (có service)
       - job_name: 'airflow-webserver'
         static_configs:
-          - targets: ['airflow-webserver-service.nexusml.svc.cluster.local:8080'] # Assuming webserver service is available
+          - targets: ['airflow-webserver-service.nexusml.svc.cluster.local:8080']
 
-      - job_name: 'airflow-scheduler'
-        static_configs:
-          - targets: ['airflow-scheduler-service.nexusml.svc.cluster.local:8974'] # Assuming scheduler health check endpoint is available
-
-      # Add other Airflow components if they expose metrics
-
-      # Scrape MLflow (if it exposes metrics)
+      # Scrape MLflow
       - job_name: 'mlflow'
         static_configs:
-          - targets: ['mlflow-service.nexusml.svc.cluster.local:5000'] # Assuming MLflow service is available
+          - targets: ['mlflow-service.nexusml.svc.cluster.local:5000']
 
-      # Scrape Jenkins (if it exposes metrics)
-      - job_name: 'jenkins'
+      # Scrape MinIO (nếu muốn)
+      - job_name: 'minio'
         static_configs:
-          - targets: ['jenkins-service.nexusml.svc.cluster.local:8080'] # Assuming Jenkins service is available
+          - targets: ['minio-service.nexusml.svc.cluster.local:9000']
 
       # Scrape PostgreSQL (if it exposes metrics, e.g., via a postgres_exporter)
       # - job_name: 'postgres'
