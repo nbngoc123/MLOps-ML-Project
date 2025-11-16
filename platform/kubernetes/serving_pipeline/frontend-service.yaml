@@ -1,14 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: serving-pipeline-frontend-service
-  namespace: nexusml # Assuming a namespace for the project
+  name: frontend
+  namespace: nexusml
 spec:
   selector:
-    app: serving-pipeline-frontend # Matches the labels in the Deployment template
+    app: frontend
   ports:
-  - protocol: TCP
-    port: 3000 # Port the frontend service listens on
-    targetPort: 3000
-    name: frontend-port
-  type: ClusterIP # Default type, accessible within the cluster
+  - name: web
+    protocol: TCP
+    port: 7860
+    targetPort: 7860
+    nodePort: 30860
+  type: LoadBalancer

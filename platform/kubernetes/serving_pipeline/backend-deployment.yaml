@@ -1,40 +1,36 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: serving-pipeline-backend
-  namespace: nexusml # Assuming a namespace for the project
+  name: backend
+  namespace: nexusml
 spec:
-  replicas: 1 # Adjust as needed
+  replicas: 1
   selector:
     matchLabels:
-      app: serving-pipeline-backend
+      app: backend
   template:
     metadata:
       labels:
-        app: serving-pipeline-backend
+        app: backend
     spec:
       containers:
       - name: backend
-        image: your-docker-repo/serving-pipeline-backend:latest # Replace with actual image name
-        ports:
-        - containerPort: 8000 # Assuming backend runs on port 8000
-          name: backend-port
+        image: nbngoc1303/backend:latest   #  Thay thế bằng image thật của bạn
+        imagePullPolicy: IfNotPresent
         env:
-        # Add environment variables needed for the backend
-        # e.g., database connection strings, API keys, etc.
-        # These should ideally come from Secrets or ConfigMaps
-        - name: POSTGRES_HOST
-          value: "postgres-service.nexusml.svc.cluster.local"
-        - name: POSTGRES_PORT
-          value: "5432"
-        - name: POSTGRES_DB
-          value: "image_db"
-        envFrom:
-        - secretRef:
-            name: postgres-secret # Reference to the PostgreSQL secret
-        # Add other necessary environment variables or config mounts
-      # If the backend needs persistent storage, add volumes here
-      # volumes:
-      # - name: backend-storage
-      #   persistentVolumeClaim:
-      #     claimName: backend-storage-pvc
+        - name: MINIO_ENDPOINT
+          value: "http://minio-service.nexusml.svc.cluster.local:9000"
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: accesskey
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: secretkey
+        - name: MINIO_BUCKET
+          value: "nexusml"
+        ports:
+        - containerPort: 8000
