@@ -11,7 +11,7 @@ POSTGRES_IMAGE="postgres-custom:latest" # Hoặc postgres:latest nếu không d�
 BACKEND_IMAGE="backend-image:latest"
 
 # Thư mục chứa manifests
-K8S_MANIFESTS="./kubernetes"
+K8S_MANIFESTS="./platform/kubernetes"
 
 # --- 2. Khởi động Minikube & Load Images ---
 

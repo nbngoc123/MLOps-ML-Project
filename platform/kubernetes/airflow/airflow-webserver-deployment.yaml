@@ -18,12 +18,12 @@ spec:
         runAsGroup: 0
       containers:
       - name: airflow-webserver
-        image: nbngoc1303/airflow-image
+        image: nbngoc1303/airflow-image:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: webserver-port
-        command: ["airflow", "webserver"]
+        command: ["airflow", "api-serve"]
         envFrom:
         - secretRef:
             name: airflow-secret

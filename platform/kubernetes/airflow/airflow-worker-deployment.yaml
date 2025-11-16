@@ -18,7 +18,7 @@ spec:
         runAsGroup: 0
       containers:
       - name: airflow-worker
-        image: nbngoc1303/airflow-image
+        image: nbngoc1303/airflow-image:latest
         imagePullPolicy: IfNotPresent
         command: ["airflow", "celery", "worker"]
         envFrom:
