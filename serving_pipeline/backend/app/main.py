@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import api_router
-from app.models.manager import ModelManager
+# from app.models.manager import ModelManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,11 +15,11 @@ logger = logging.getLogger("ml-server")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Loading ML models...")
-    await ModelManager.initialize()
+    # await ModelManager.initialize()
     logger.info("ML models loaded successfully!")
     yield
     logger.info("Shutting down, releasing resources...")
-    await ModelManager.cleanup()
+    # await ModelManager.cleanup()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
