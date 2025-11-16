@@ -39,10 +39,20 @@ spec:
         - /bin/bash
         - -c
         - |
-          # Tạo database airflow nếu chưa tồn tại
-          psql -h postgres-service.nexusml.svc.cluster.local -U postgres -d postgres -c "CREATE DATABASE airflow;" || true
+          # Kiểm tra kết nối PostgreSQL
+          export PGPASSWORD=$POSTGRES_PASSWORD
+          
+          # Thử kết nối và tạo database
+          if pg_isready -h postgres-service.nexusml.svc.cluster.local -U $POSTGRES_USER; then
+            psql -h postgres-service.nexusml.svc.cluster.local -U $POSTGRES_USER -d postgres -c "SELECT 1 FROM pg_database WHERE datname = 'airflow'" | grep -q 1 || \
+            psql -h postgres-service.nexusml.svc.cluster.local -U $POSTGRES_USER -d postgres -c "CREATE DATABASE airflow;"
+          else
+            echo "Không thể kết nối tới PostgreSQL"
+            exit 1
+          fi
           
           # Di chuyển và khởi tạo database Airflow
+          airflow db init && \
           airflow db migrate && \
           airflow users create \
             --username admin \
@@ -53,11 +63,11 @@ spec:
             --password admin
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "1.5Gi"
-            cpu: "1000m"
+            memory: "512Mi"
+            cpu: "500m"
       restartPolicy: Never
       volumes:
       - name: airflow-dags
