@@ -33,10 +33,12 @@ spec:
               name: postgres-secret
               key: POSTGRES_PASSWORD
         - name: POSTGRES_DB
-          value: "image_db" # From docker-compose.yaml
+          value: "postgres" # Default database, init script will create image_db and airflow
         volumeMounts:
         - name: postgres-data
-          mountPath: /var/lib/postgresql
+          mountPath: /var/lib/postgresql/data
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
         resources:
           requests:
             memory: "1Gi"
@@ -44,7 +46,11 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "1000m"
-
+      volumes:
+      - name: init-script
+        configMap:
+          name: postgres-init-script
+          defaultMode: 0755
 
   volumeClaimTemplates:
   - metadata:

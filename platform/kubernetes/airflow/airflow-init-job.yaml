@@ -37,31 +37,39 @@ spec:
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
         command:
-        - /bin/bash
-        - -c
-        - |
-          # Kiểm tra kết nối PostgreSQL
-          export PGPASSWORD=$POSTGRES_PASSWORD
-          
-          # Thử kết nối và tạo database
-          if pg_isready -h postgres-service.nexusml.svc.cluster.local -U $POSTGRES_USER; then
-            psql -h postgres-service.nexusml.svc.cluster.local -U $POSTGRES_USER -d postgres -c "SELECT 1 FROM pg_database WHERE datname = 'airflow'" | grep -q 1 || \
-            psql -h postgres-service.nexusml.svc.cluster.local -U $POSTGRES_USER -d postgres -c "CREATE DATABASE airflow;"
-          else
-            echo "Không thể kết nối tới PostgreSQL"
-            exit 1
-          fi
-          
-          # Di chuyển và khởi tạo database Airflow
-          airflow db init && \
-          airflow db migrate && \
-          airflow users create \
-            --username admin \
-            --firstname Admin \
-            --lastname User \
-            --role Admin \
-            --email admin@example.com \
-            --password admin
+          - /bin/bash
+          - -c
+          - |
+            # Đợi PostgreSQL sẵn sàng
+            echo "Đang đợi PostgreSQL..."
+            until pg_isready -h postgres-service.nexusml.svc.cluster.local -U postgres; do
+              echo "PostgreSQL chưa sẵn sàng, đợi 5 giây..."
+              sleep 5
+            done
+            
+            echo "PostgreSQL đã sẵn sàng!"
+            
+            # Đợi thêm để đảm bảo database airflow đã được tạo
+            sleep 10
+            
+            # Khởi tạo database Airflow
+            echo "Khởi tạo Airflow database..."
+            airflow db init
+            
+            echo "Migrate Airflow database..."
+            airflow db migrate
+            
+            # Tạo admin user
+            echo "Tạo admin user..."
+            airflow users create \
+              --username admin \
+              --firstname Admin \
+              --lastname User \
+              --role Admin \
+              --email admin@example.com \
+              --password admin || echo "Admin user đã tồn tại"
+            
+            echo "Airflow init hoàn thành!"
         resources:
           requests:
             memory: "256Mi"
