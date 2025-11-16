@@ -36,7 +36,7 @@ spec:
           value: "postgres" # Default database, init script will create image_db and airflow
         volumeMounts:
         - name: postgres-data
-          mountPath: /var/lib/postgresql/data
+          mountPath: /var/lib/postgresql
         - name: init-script
           mountPath: /docker-entrypoint-initdb.d
         resources:
