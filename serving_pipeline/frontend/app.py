@@ -1,5 +1,9 @@
 import gradio as gr
 import os
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime
 from dotenv import load_dotenv
 import httpx # Thêm thư viện httpx
 
@@ -22,7 +26,7 @@ async def sentiment_classification(text):
                 f"{BACKEND_URL}/sentiment/predict",
                 json={"text": text}
             )
-            response.raise_for_status() # Ném lỗi nếu status code là 4xx hoặc 5xx
+            response.raise_for_status() 
             result = response.json()
             return result.get("sentiment", "Không xác định")
     except httpx.RequestError as e:
