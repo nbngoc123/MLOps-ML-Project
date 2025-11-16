@@ -15,18 +15,18 @@ K8S_MANIFESTS="./platform/kubernetes"
 
 # --- 2. Khởi động Minikube & Load Images ---
 
-echo "--- Khởi động Minikube và Load Images ---"
-minikube start --driver=docker --memory=6g --cpus=2
-if [ $? -ne 0 ]; then
-    echo "Lỗi: Không thể khởi động Minikube. Vui lòng kiểm tra Docker/WSL2."
-    exit 1
-fi
+# echo "--- Khởi động Minikube và Load Images ---"
+# minikube start --driver=docker --memory=6g --cpus=2
+# if [ $? -ne 0 ]; then
+#     echo "Lỗi: Không thể khởi động Minikube. Vui lòng kiểm tra Docker/WSL2."
+#     exit 1
+# fi
 
 # Load các images đã build vào Minikube
-minikube image load ${AIRFLOW_IMAGE}
-minikube image load ${MLFLOW_IMAGE}
-minikube image load ${POSTGRES_IMAGE}
-minikube image load ${BACKEND_IMAGE}
+# minikube image load ${AIRFLOW_IMAGE}
+# minikube image load ${MLFLOW_IMAGE}
+# minikube image load ${POSTGRES_IMAGE}
+# minikube image load ${BACKEND_IMAGE}
 
 
 # --- 3. Triển khai PostgreSQL (Database) ---
