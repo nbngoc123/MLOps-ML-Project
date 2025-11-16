@@ -11,7 +11,8 @@ spec:
         runAsGroup: 0
       containers:
       - name: airflow-init
-        image: apache/airflow:2.10.3
+        image: nbngoc1303/airflow-image
+        imagePullPolicy: IfNotPresent
         env:
         - name: POSTGRES_USER
           valueFrom:
