@@ -29,13 +29,13 @@ sleep 3
 
 echo ""
 echo "=== Bước 2: Apply ConfigMap init script ==="
-kubectl apply -f platform/kubernetes/postgres/postgres-init-configmap.yaml
+kubectl apply -f kubernetes/postgres/postgres-init-configmap.yaml
 
 echo ""
 echo "=== Bước 3: Deploy lại PostgreSQL ==="
-kubectl apply -f platform/kubernetes/postgres/postgres-secret.yaml
-kubectl apply -f platform/kubernetes/postgres/postgres-service.yaml
-kubectl apply -f platform/kubernetes/postgres/postgres-statefulset.yaml
+kubectl apply -f kubernetes/postgres/postgres-secret.yaml
+kubectl apply -f kubernetes/postgres/postgres-service.yaml
+kubectl apply -f kubernetes/postgres/postgres-statefulset.yaml
 
 echo ""
 echo "=== Bước 4: Đợi PostgreSQL sẵn sàng ==="
