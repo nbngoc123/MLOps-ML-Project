@@ -12,6 +12,17 @@ spec:
       containers:
       - name: airflow-init
         image: apache/airflow:2.10.3
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
         envFrom:
         - secretRef:
             name: airflow-secret
@@ -28,6 +39,10 @@ spec:
         - /bin/bash
         - -c
         - |
+          # Tạo database airflow nếu chưa tồn tại
+          psql -h postgres-service.nexusml.svc.cluster.local -U postgres -d postgres -c "CREATE DATABASE airflow;" || true
+          
+          # Di chuyển và khởi tạo database Airflow
           airflow db migrate && \
           airflow users create \
             --username admin \
