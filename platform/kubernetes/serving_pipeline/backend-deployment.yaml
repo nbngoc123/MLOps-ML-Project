@@ -24,12 +24,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: minio-secret
-              key: accesskey
+              key: MINIO_ROOT_USER
         - name: MINIO_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: minio-secret
-              key: secretkey
+              key: MINIO_ROOT_PASSWORD
         - name: MINIO_BUCKET
           value: "nexusml"
         ports:
