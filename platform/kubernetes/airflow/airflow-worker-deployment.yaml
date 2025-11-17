@@ -19,7 +19,7 @@ spec:
       containers:
       - name: airflow-worker
         image: nbngoc1303/airflow-image:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         command: ["airflow", "celery", "worker"]
         envFrom:
         - secretRef:

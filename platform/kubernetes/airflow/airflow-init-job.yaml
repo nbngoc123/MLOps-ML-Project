@@ -4,6 +4,7 @@ metadata:
   name: airflow-init
   namespace: nexusml
 spec:
+  ttlSecondsAfterFinished: 300
   template:
     spec:
       securityContext:
@@ -12,7 +13,7 @@ spec:
       containers:
       - name: airflow-init
         image: nbngoc1303/airflow-image
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         env:
         - name: POSTGRES_USER
           valueFrom:
@@ -54,8 +55,7 @@ spec:
             sleep 10
             
             # Khởi tạo database Airflow
-            echo "Khởi tạo Airflow database..."
-            airflow db init
+
             
             echo "Migrate Airflow database..."
             airflow db migrate

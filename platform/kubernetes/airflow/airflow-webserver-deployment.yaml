@@ -19,7 +19,7 @@ spec:
       containers:
       - name: airflow-webserver
         image: nbngoc1303/airflow-image:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
           name: webserver-port
