@@ -38,6 +38,10 @@ spec:
           timeoutSeconds: 10
           failureThreshold: 5
         env:
+          - name: AIRFLOW__API__HOST
+            value: "airflow-webserver-service"
+          - name: AIRFLOW__API__PORT
+            value: "8080"
           - name: AIRFLOW__CORE__AUTH_MANAGER
             value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
           - name: AIRFLOW__CORE__INTERNAL_API_URL
