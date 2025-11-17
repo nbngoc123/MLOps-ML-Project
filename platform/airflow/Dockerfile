@@ -11,7 +11,7 @@ RUN apt-get update && \
 USER airflow
 
 COPY requirements.txt .
+COPY dags/ /opt/airflow/dags/
 
-# --- KHẮC PHỤC LỖI TẠI ĐÂY ---
 # Cài thêm 'apache-airflow-providers-fab' để có lệnh 'airflow users' và giao diện UI cũ
 RUN pip install --no-cache-dir apache-airflow-providers-fab -r requirements.txt
