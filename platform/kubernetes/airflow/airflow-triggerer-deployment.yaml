@@ -30,7 +30,8 @@ spec:
         - name: airflow-logs
           mountPath: /opt/airflow/logs
         - name: airflow-config
-          mountPath: /opt/airflow/config
+          mountPath: /opt/airflow/config/airflow.cfg
+          subPath: airflow.cfg
         - name: airflow-plugins
           mountPath: /opt/airflow/plugins
         resources:
@@ -49,8 +50,8 @@ spec:
         persistentVolumeClaim:
           claimName: airflow-logs-pvc
       - name: airflow-config
-        persistentVolumeClaim:
-          claimName: airflow-config-pvc
+        configMap:
+          name: airflow-config
       - name: airflow-plugins
         persistentVolumeClaim:
           claimName: airflow-plugins-pvc

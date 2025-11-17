@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: airflow-worker
+  name: airflow-dag-processor
   namespace: nexusml
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: airflow-worker
+      app: airflow-dag-processor
   template:
     metadata:
       labels:
-        app: airflow-worker
+        app: airflow-dag-processor
     spec:
       securityContext:
         runAsUser: 50000
         runAsGroup: 0
       containers:
-      - name: airflow-worker
+      - name: airflow-dag-processor
         image: nbngoc1303/airflow-image:latest
         imagePullPolicy: IfNotPresent
-        command: ["airflow", "celery", "worker"]
+        command: ["airflow", "dag-processor"]
         envFrom:
         - secretRef:
             name: airflow-secret
@@ -36,13 +36,12 @@ spec:
           mountPath: /opt/airflow/plugins
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "512Mi"
+            cpu: "250m"
           limits:
-            memory: "4Gi"
-            cpu: "10000m"
+            memory: "2Gi"
+            cpu: "500m"
 
-            
       volumes:
       - name: airflow-dags
         persistentVolumeClaim:

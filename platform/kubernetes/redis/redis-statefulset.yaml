@@ -2,10 +2,10 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: redis
-  namespace: nexusml # Assuming a namespace for the project
+  namespace: nexusml
 spec:
   serviceName: redis-service
-  replicas: 1 # Typically one replica is sufficient for a Redis broker
+  replicas: 1
   selector:
     matchLabels:
       app: redis
@@ -16,18 +16,15 @@ spec:
     spec:
       containers:
       - name: redis
-        image: redis:7.2-bookworm # Using the same image as in docker-compose
+        image: redis:6.2.6-alpine
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 6379
           name: redis-port
-        volumeMounts:
-        - name: redis-data
-          mountPath: /data
-  volumeClaimTemplates:
-  - metadata:
-      name: redis-data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 1Gi # Adjust storage size as needed for Redis data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
