@@ -4,7 +4,7 @@ metadata:
   name: airflow-worker
   namespace: nexusml
 spec:
-  replicas: 1
+  replicas: 2                                 # 2 worker là tối ưu cho node 4-core
   selector:
     matchLabels:
       app: airflow-worker
@@ -16,74 +16,70 @@ spec:
       terminationGracePeriodSeconds: 120
       securityContext:
         runAsUser: 50000
-        runAsGroup: 0
+        runAsGroup: 50000
+        fsGroup: 50000                        # fix quyền ghi logs/dags
       containers:
       - name: airflow-worker
         image: nbngoc1303/airflow-image:latest
         imagePullPolicy: Always
         command: ["airflow", "celery", "worker"]
-        env:
-        # --- THÊM DÒNG NÀY ---
-        - name: AIRFLOW__CORE__AUTH_MANAGER
-          value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
-        
-
-        # --- 2. Cấu hình MinIO/S3 ---
-        # A. TRUYỀN ACCESS KEY (Tên biến trong Pod: MINIO_ACCESS_KEY)
-        - name: MINIO_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-secret
-              key: MINIO_ROOT_USER 
-        
-        # B. TRUYỀN SECRET KEY (Tên biến trong Pod: MINIO_SECRET_KEY)
-        - name: MINIO_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-secret
-              key: MINIO_ROOT_PASSWORD 
-
-        # C. TRUYỀN ENDPOINT (Dùng cho code DAG)
-        - name: MINIO_ENDPOINT
-          value: "http://minio-service.nexusml.svc.cluster.local:9000"
-          
-        # --- 3. Cấu hình MLflow (Quan trọng) ---
-        # Đảm bảo MLflow biết cách kết nối với MinIO
-        - name: MLFLOW_S3_ENDPOINT_URL
-          value: "http://minio-service.nexusml.svc.cluster.local:9000"
-
-        envFrom:
-        - secretRef:
-            name: airflow-secret
-        volumeMounts:
-        - name: airflow-dags
-          mountPath: /opt/airflow/dags
-        - name: airflow-logs
-          mountPath: /opt/airflow/logs
-        - name: airflow-config
-          mountPath: /opt/airflow/config/airflow.cfg
-          subPath: airflow.cfg
-        - name: airflow-plugins
-          mountPath: /opt/airflow/plugins
         resources:
           requests:
             memory: "1Gi"
-            cpu: "250m"
+            cpu: "250m"                         # cực thấp → không bao giờ Pending nữa
           limits:
             memory: "6Gi"
-            cpu: "3000m"
-
-            
+            cpu: "3000m"                        # task ML nặng vẫn dùng được
+        livenessProbe:
+          exec:
+            command: ["celery", "-A", "airflow.executors.celery_executor", "inspect", "ping"]
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        env:
+          - name: AIRFLOW__CORE__AUTH_MANAGER
+            value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
+          - name: AIRFLOW__WEBSERVER__BASE_URL
+            value: "http://airflow-webserver.nexusml.svc.cluster.local:8080"
+          # MinIO
+          - name: MINIO_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: minio-secret
+                key: MINIO_ROOT_USER
+          - name: MINIO_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: minio-secret
+                key: MINIO_ROOT_PASSWORD
+          - name: MINIO_ENDPOINT
+            value: "http://minio-service.nexusml.svc.cluster.local:9000"
+          - name: MLFLOW_S3_ENDPOINT_URL
+            value: "http://minio-service.nexusml.svc.cluster.local:9000"
+        envFrom:
+          - secretRef:
+              name: airflow-secret
+        volumeMounts:
+          - name: airflow-dags
+            mountPath: /opt/airflow/dags
+          - name: airflow-logs
+            mountPath: /opt/airflow/logs
+          - name: airflow-config
+            mountPath: /opt/airflow/config/airflow.cfg
+            subPath: airflow.cfg
+          - name: airflow-plugins
+            mountPath: /opt/airflow/plugins
       volumes:
-      - name: airflow-dags
-        persistentVolumeClaim:
-          claimName: airflow-dags-pvc
-      - name: airflow-logs
-        persistentVolumeClaim:
-          claimName: airflow-logs-pvc
-      - name: airflow-config
-        configMap:
-          name: airflow-config
-      - name: airflow-plugins
-        persistentVolumeClaim:
-          claimName: airflow-plugins-pvc
+        - name: airflow-dags
+          persistentVolumeClaim:
+            claimName: airflow-dags-pvc
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: airflow-logs-pvc
+        - name: airflow-config
+          configMap:
+            name: airflow-config
+        - name: airflow-plugins
+          persistentVolumeClaim:
+            claimName: airflow-plugins-pvc

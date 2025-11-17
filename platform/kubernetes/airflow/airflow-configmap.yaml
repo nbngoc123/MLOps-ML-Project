@@ -4,22 +4,37 @@ metadata:
   name: airflow-config
   namespace: nexusml
 data:
-  # Cấu hình chung cho Airflow
   airflow.cfg: |
     [core]
     dags_folder = /opt/airflow/dags
     plugins_folder = /opt/airflow/plugins
     base_log_folder = /opt/airflow/logs
-    
+    load_examples = False
+    executor = CeleryExecutor
+    parallelism = 16
+    dag_concurrency = 16
+    max_active_runs_per_dag = 1
+
     [webserver]
     authenticate = True
-    auth_backend = airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
-    
+    auth_backend = airflow.providers.fab.auth_manager.auth_manager.FabAuthManager
+    base_url = http://airflow-webserver.nexusml.svc.cluster.local:8080
+    enable_proxy_fix = True
+    expose_config = False
+
+    [api]
+    # Cho phép worker gọi API mà không cần token (an toàn trong cluster)
+    auth_backends = airflow.api.auth.backend.allow_all
+
     [scheduler]
     dag_dir_list_interval = 30
-    
+    parsing_processes = 2
+    scheduler_heartbeat_sec = 10
+
     [celery]
-    worker_concurrency = 16
-    
-    [api]
-    auth_backend = airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+    worker_concurrency = 8          # 2 worker × 8 = 16 slot, vừa đủ cho node 4-core
+    broker_url = redis://redis-service.nexusml.svc.cluster.local:6379/0
+    result_backend = db+postgresql://airflow:{{POSTGRES_PASSWORD}}@postgres-service.nexusml.svc.cluster.local:5432/airflow
+
+    [celery_broker_transport_options]
+    visibility_timeout = 21600
