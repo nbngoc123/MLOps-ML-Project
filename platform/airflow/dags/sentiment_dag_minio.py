@@ -10,11 +10,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
 import joblib
 import s3fs
-import boto3 # Dùng boto3 cho thao tác bucket ổn định hơn
+import boto3
 import os
 import mlflow
 import logging
+from botocore.client import Config
 
+# Khởi tạo Logger
 log = logging.getLogger(__name__)
 
 # -------------------------------
@@ -45,62 +47,74 @@ default_args = {
 dag = DAG(
     'sentiment_classification_minio_optimized',
     default_args=default_args,
-    description='Train & Deploy Sentiment Model',
+    description='Train & Deploy Sentiment Model using Boto3 for Bucket Ops',
     schedule='0 2 * * *', 
     catchup=False,
 )
 
 # -------------------------------
-# Tasks (ĐÃ SỬA: KHỞI TẠO KẾT NỐI TRONG HÀM)
+# Helper Function: Get Boto3 Client
+# -------------------------------
+def get_s3_client():
+    return boto3.client(
+        's3',
+        endpoint_url=MINIO_ENDPOINT,
+        aws_access_key_id=MINIO_ACCESS_KEY,
+        aws_secret_access_key=MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4')
+    )
+
+# -------------------------------
+# Tasks 
 # -------------------------------
 
 @task(dag=dag)
 def ensure_bucket_exists():
-    """Dùng Boto3 để tạo bucket (ổn định hơn s3fs cho việc này)."""
-    log.info(f"Đang kết nối tới MinIO: {MINIO_ENDPOINT}")
+    """Dùng Boto3 để tạo bucket và folder ảo."""
+    s3 = get_s3_client()
     
-    s3_client = boto3.client(
-        's3',
-        endpoint_url=MINIO_ENDPOINT,
-        aws_access_key_id=MINIO_ACCESS_KEY,
-        aws_secret_access_key=MINIO_SECRET_KEY
-    )
-    
+    # 1. Kiểm tra và tạo Bucket
     try:
-        s3_client.head_bucket(Bucket=MINIO_BUCKET)
-        log.info(f"Bucket {MINIO_BUCKET} đã tồn tại.")
+        s3.head_bucket(Bucket=MINIO_BUCKET)
+        log.info(f"Bucket '{MINIO_BUCKET}' đã tồn tại.")
     except Exception:
-        log.info(f"Bucket {MINIO_BUCKET} chưa tồn tại. Đang tạo...")
-        s3_client.create_bucket(Bucket=MINIO_BUCKET)
-    
-    # Tạo các "thư mục" giả lập (S3 không có thư mục thật, chỉ là prefix)
-    # Ta tạo file .keep để giữ chỗ
+        log.info(f"Bucket '{MINIO_BUCKET}' chưa tồn tại. Đang tạo...")
+        try:
+            s3.create_bucket(Bucket=MINIO_BUCKET)
+        except Exception as e:
+            if "BucketAlreadyOwnedByYou" not in str(e):
+                raise e
+
+    # 2. Tạo folder ảo (raw, processed, models) bằng file .keep
     folders = ["raw", "processed", "models"]
     for folder in folders:
+        key = f"{folder}/.keep"
         try:
-            s3_client.put_object(Bucket=MINIO_BUCKET, Key=f"{folder}/.keep")
+            s3.put_object(Bucket=MINIO_BUCKET, Key=key, Body="")
+            log.info(f"Đã tạo placeholder: {key}")
         except Exception as e:
-            log.warning(f"Không thể tạo placeholder cho {folder}: {e}")
-
-    log.info("Cấu trúc thư mục đã sẵn sàng.")
+            log.warning(f"Không thể tạo file {key}: {e}")
 
 @task(dag=dag)
 def extract_and_combine_data():
-    # KHỞI TẠO s3fs BÊN TRONG HÀM
-    fs = s3fs.S3FileSystem(
-        client_kwargs={'endpoint_url': MINIO_ENDPOINT},
-        key=MINIO_ACCESS_KEY,
-        secret=MINIO_SECRET_KEY
-    )
+    """Dùng Boto3 để liệt kê file, sau đó dùng Pandas+s3fs để đọc."""
+    s3 = get_s3_client()
     
-    raw_path_prefix = f"{MINIO_BUCKET}/raw/"
-    all_csv_files = fs.glob(f"{raw_path_prefix}*.csv")
+    # 1. Liệt kê tất cả file .csv trong thư mục raw/
+    response = s3.list_objects_v2(Bucket=MINIO_BUCKET, Prefix="raw/")
     
-    if not all_csv_files:
-        raise ValueError(f"Không tìm thấy file CSV nào trong {raw_path_prefix}")
+    csv_files = []
+    if 'Contents' in response:
+        for obj in response['Contents']:
+            if obj['Key'].endswith('.csv'):
+                csv_files.append(f"s3://{MINIO_BUCKET}/{obj['Key']}")
     
-    log.info(f"Tìm thấy {len(all_csv_files)} file: {all_csv_files}")
+    if not csv_files:
+        raise ValueError(f"Không tìm thấy file CSV nào trong {MINIO_BUCKET}/raw/")
+    
+    log.info(f"Tìm thấy {len(csv_files)} file CSV: {csv_files}")
 
+    # 2. Đọc và gộp dữ liệu
     df_list = []
     storage_options = {
         "key": MINIO_ACCESS_KEY,
@@ -108,12 +122,21 @@ def extract_and_combine_data():
         "client_kwargs": {"endpoint_url": MINIO_ENDPOINT}
     }
 
-    for file_path in all_csv_files:
-        log.info(f"Đọc file: {file_path}")
-        df_list.append(pd.read_csv(f"s3://{file_path}", storage_options=storage_options))
-        
+    for file_path in csv_files:
+        log.info(f"Đang đọc: {file_path}")
+        try:
+            df_temp = pd.read_csv(file_path, storage_options=storage_options)
+            df_list.append(df_temp)
+        except Exception as e:
+            log.error(f"Lỗi đọc file {file_path}: {e}")
+
+    if not df_list:
+        raise ValueError("Không đọc được dữ liệu nào.")
+
     combined_df = pd.concat(df_list, ignore_index=True)
-    
+    log.info(f"Tổng số dòng dữ liệu: {len(combined_df)}")
+
+    # 3. Lưu file gộp
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     s3_path_temp = f"{MINIO_BUCKET}/processed/combined_raw_{timestamp}.csv"
     
@@ -128,11 +151,15 @@ def preprocess_data(s3_raw_temp: str):
         "client_kwargs": {"endpoint_url": MINIO_ENDPOINT}
     }
     
+    log.info(f"Tiền xử lý file: {s3_raw_temp}")
     df = pd.read_csv(f"s3://{s3_raw_temp}", storage_options=storage_options)
+    
+    # Làm sạch text
     df['text'] = df['text'].str.lower().str.replace(
         r'[^a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ]',
         '', regex=True
     )
+    
     s3_clean = s3_raw_temp.replace("combined_raw", "clean_data")
     df.to_csv(f"s3://{s3_clean}", index=False, storage_options=storage_options)
     return s3_clean
@@ -144,15 +171,19 @@ def train_model(s3_clean: str):
         "secret": MINIO_SECRET_KEY,
         "client_kwargs": {"endpoint_url": MINIO_ENDPOINT}
     }
+    
+    log.info(f"Huấn luyện trên file: {s3_clean}")
     df = pd.read_csv(f"s3://{s3_clean}", storage_options=storage_options)
     
     if df.empty or len(df) < 5:
-        raise ValueError("Dữ liệu quá ít.")
+        raise ValueError("Dữ liệu quá ít để huấn luyện.")
 
-    # Map label
+    # Map label & xử lý dữ liệu
     label_map = {"positive": 1, "negative": 0, "neutral": 2}
-    # Xử lý trường hợp label trong CSV không khớp
-    df['label_id'] = df['label'].map(label_map).fillna(2) # Mặc định neutral nếu lỗi
+    df['label_id'] = df['label'].map(label_map).fillna(2)
+    
+    # Đảm bảo không có NaN trong text
+    df['text'] = df['text'].fillna("")
 
     X_train, X_test, y_train, y_test = train_test_split(
         df['text'].astype(str), df['label_id'],
@@ -166,11 +197,12 @@ def train_model(s3_clean: str):
     model = LogisticRegression(max_iter=1000)
     model.fit(X_train_vec, y_train)
 
-    # Lưu artifacts
+    # Lưu artifacts cục bộ
     os.makedirs("/tmp/models", exist_ok=True)
     joblib.dump(vectorizer, "/tmp/models/vectorizer.pkl")
     joblib.dump(model, "/tmp/models/model.pkl")
 
+    # Log lên MLflow
     mlflow.set_experiment("sentiment_classification")
     with mlflow.start_run(run_name=f"minio_run_{datetime.now().strftime('%Y%m%d_%H%M')}") as run:
         preds = model.predict(X_test_vec)
@@ -186,24 +218,26 @@ def train_model(s3_clean: str):
 
 @task(dag=dag)
 def evaluate_model(train_output: dict):
-    return "register_model" if train_output.get("accuracy") >= 0.6 else "notify_failure"
+    acc = train_output.get("accuracy")
+    log.info(f"Độ chính xác mô hình: {acc}")
+    return "register_model" if acc >= 0.6 else "notify_failure"
 
 @task(dag=dag)
 def register_model(train_output: dict):
-    # KHỞI TẠO s3fs TRONG HÀM
-    fs = s3fs.S3FileSystem(
-        client_kwargs={'endpoint_url': MINIO_ENDPOINT},
-        key=MINIO_ACCESS_KEY,
-        secret=MINIO_SECRET_KEY
-    )
     run_id = train_output.get("run_id")
     model_uri = f"runs:/{run_id}/model"
-    registered = mlflow.register_model(model_uri, "SentimentClassifier")
     
-    version_path = f"{MINIO_BUCKET}/models/sentiment/v{registered.version}"
-    fs.makedirs(version_path, exist_ok=True)
-    fs.put("/tmp/models/model.pkl", f"{version_path}/model.pkl")
-    fs.put("/tmp/models/vectorizer.pkl", f"{version_path}/vectorizer.pkl")
+    registered = mlflow.register_model(model_uri, "SentimentClassifier")
+    log.info(f"Đã đăng ký model phiên bản: {registered.version}")
+    
+    # Upload bản sao model sang MinIO dùng Boto3
+    s3 = get_s3_client()
+    version_path = f"models/sentiment/v{registered.version}"
+    
+    s3.upload_file("/tmp/models/model.pkl", MINIO_BUCKET, f"{version_path}/model.pkl")
+    s3.upload_file("/tmp/models/vectorizer.pkl", MINIO_BUCKET, f"{version_path}/vectorizer.pkl")
+    
+    log.info(f"Đã upload model backup tới: {MINIO_BUCKET}/{version_path}")
 
 # -------------------------------
 # Dependencies
