@@ -25,7 +25,35 @@ spec:
         # --- THÊM DÒNG NÀY ---
         - name: AIRFLOW__CORE__AUTH_MANAGER
           value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
+        - name: MINIO_ACCESS_KEY  
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_USER
+        # --- 2. Cấu hình MinIO/S3 ---
+        # A. TRUYỀN ACCESS KEY (Tên biến trong Pod: MINIO_ACCESS_KEY)
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_USER 
+        
+        # B. TRUYỀN SECRET KEY (Tên biến trong Pod: MINIO_SECRET_KEY)
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_PASSWORD 
+
+        # C. TRUYỀN ENDPOINT (Dùng cho code DAG)
+        - name: MINIO_ENDPOINT
+          value: "http://minio-service.nexusml.svc.cluster.local:9000"
           
+        # --- 3. Cấu hình MLflow (Quan trọng) ---
+        # Đảm bảo MLflow biết cách kết nối với MinIO
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: "http://minio-service.nexusml.svc.cluster.local:9000"
+
         envFrom:
         - secretRef:
             name: airflow-secret
