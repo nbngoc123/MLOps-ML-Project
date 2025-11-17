@@ -4,7 +4,7 @@ metadata:
   name: airflow-worker
   namespace: nexusml
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: airflow-worker
@@ -68,7 +68,7 @@ spec:
         resources:
           requests:
             memory: "1Gi"
-            cpu: "500m"
+            cpu: "250m"
           limits:
             memory: "6Gi"
             cpu: "3000m"
