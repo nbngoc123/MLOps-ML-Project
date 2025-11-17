@@ -17,7 +17,7 @@ spec:
       containers:
       - name: postgres
         image: nbngoc1303/postgres-custom # Using the same image as in docker-compose
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 5432
           name: postgres-port
