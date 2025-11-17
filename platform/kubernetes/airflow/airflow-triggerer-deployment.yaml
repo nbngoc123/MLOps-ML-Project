@@ -25,20 +25,6 @@ spec:
         # --- THÊM DÒNG NÀY ---
         - name: AIRFLOW__CORE__AUTH_MANAGER
           value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
-          
-        - name: MINIO_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-secrets # Tên Secret chứa key/value MinIO
-              key: MINIO_ACCESS_KEY
-        - name: MINIO_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-secrets
-              key: MINIO_SECRET_KEY
-
-        - name: MLFLOW_S3_ENDPOINT_URL
-          value: "http://minio-service.nexusml.svc.cluster.local:9000"
         envFrom:
         - secretRef:
             name: airflow-secret
