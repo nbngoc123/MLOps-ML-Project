@@ -52,7 +52,8 @@ dag = DAG(
     'sentiment_classification_minio_optimized',
     default_args=default_args,
     description='Train & Deploy Sentiment Model with MinIO and MLflow',
-    schedule_interval='0 2 * * *',
+    # THAY THẾ 'schedule_interval' bằng 'schedule'
+    schedule='0 2 * * *', 
     catchup=False,
 )
 
