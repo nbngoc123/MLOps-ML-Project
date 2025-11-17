@@ -41,9 +41,9 @@ spec:
           - name: AIRFLOW__CORE__AUTH_MANAGER
             value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
           - name: AIRFLOW__CORE__INTERNAL_API_URL
-            value: "http://airflow-webserver.nexusml.svc.cluster.local:8080/api/v1/internal"
+            value: "http://airflow-webserver-service.nexusml.svc.cluster.local:8080/api/v1/internal"
           - name: AIRFLOW__WEBSERVER__BASE_URL
-            value: "http://airflow-webserver.nexusml.svc.cluster.local:8080"
+            value: "http://airflow-webserver-service.nexusml.svc.cluster.local:8080"
           
           # MinIO
           - name: MINIO_ACCESS_KEY
