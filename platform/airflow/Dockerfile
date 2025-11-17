@@ -2,7 +2,7 @@ FROM apache/airflow:3.1.2
 
 USER root
 
-# Cài thêm các package hệ thống nếu cần
+# Cài thêm các package hệ thống
 RUN apt-get update && \
     apt-get install -y git postgresql-client && \
     apt-get clean && \
@@ -10,8 +10,8 @@ RUN apt-get update && \
 
 USER airflow
 
-# Copy requirements
 COPY requirements.txt .
 
-# Cài dependencies python
-RUN pip install --no-cache-dir -r requirements.txt
+# --- KHẮC PHỤC LỖI TẠI ĐÂY ---
+# Cài thêm 'apache-airflow-providers-fab' để có lệnh 'airflow users' và giao diện UI cũ
+RUN pip install --no-cache-dir apache-airflow-providers-fab -r requirements.txt
