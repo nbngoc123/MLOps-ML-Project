@@ -19,8 +19,8 @@ import mlflow
 # -------------------------------
 
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://minio-service.nexusml.svc.cluster.local:9000")
-MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "") 
-MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "") 
+MINIO_ACCESS_KEY = os.environ.get("MINIO_ROOT_USER", "") 
+MINIO_SECRET_KEY = os.environ.get("MINIO_ROOT_PASSWORD", "") 
 MINIO_BUCKET = "nexusml"
 
 fs = s3fs.S3FileSystem(
