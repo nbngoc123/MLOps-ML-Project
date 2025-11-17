@@ -24,6 +24,10 @@ spec:
         - containerPort: 8080
           name: webserver-port
         command: ["airflow", "api-server"]
+        env:
+        # --- THÊM DÒNG NÀY ---
+        - name: AIRFLOW__CORE__AUTH_MANAGER
+          value: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
         envFrom:
         - secretRef:
             name: airflow-secret
