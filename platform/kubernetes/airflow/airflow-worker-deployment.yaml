@@ -4,7 +4,7 @@ metadata:
   name: airflow-worker
   namespace: nexusml
 spec:
-  replicas: 2                                 # 2 worker là tối ưu cho node 4-core
+  replicas: 1                                 # 2 worker là tối ưu cho node 4-core
   selector:
     matchLabels:
       app: airflow-worker
