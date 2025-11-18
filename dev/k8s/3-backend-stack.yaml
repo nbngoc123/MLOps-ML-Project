@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        # ================================================
+        # TODO: SỬA LẠI TÊN IMAGE CỦA BẠN
+        image: nbngoc1303/backend:1.0
+        # ================================================
+        ports:
+        - containerPort: 8000
+        env:
+        # Lấy từ ConfigMap
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: serving-config
+              key: MINIO_ENDPOINT
+        - name: MLFLOW_TRACKING_URI
+          valueFrom:
+            configMapKeyRef:
+              name: serving-config
+              key: MLFLOW_TRACKING_URI
+        # Lấy từ Secret
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_USER
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_PASSWORD
+        - name: MINIO_BUCKET
+          value: "nexusml" # Hardcode
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service # Tên DNS
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

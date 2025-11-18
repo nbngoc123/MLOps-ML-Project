@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+type: Opaque
+stringData:
+  # Credentials cho MinIO
+  MINIO_ROOT_USER: "minioadmin"
+  MINIO_ROOT_PASSWORD: "minioadmin"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: serving-config
+data:
+  # Tên DNS nội bộ của K8s
+  MINIO_HOST: "minio-service"
+  MLFLOW_HOST: "mlflow-service"
+  BACKEND_HOST: "backend-service"
+  
+  # Endpoints đầy đủ
+  MINIO_ENDPOINT: "http://minio-service:9000"
+  MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
+  BACKEND_URL: "http://backend-service:8000/api" # Dùng cho Frontend
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce # Chỉ cho phép 1 pod đọc/ghi cùng lúc
+  resources:
+    requests:
+      storage: 5Gi # Yêu cầu 5GB (Bạn có thể tăng lên)
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi # 1GB cho database của MLflow (SQLite)

@@ -1,0 +1,70 @@
+# ===== OS =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===== Editors =====
+# VSCode
+.vscode/
+.history/
+
+# JetBrains IDEs
+.idea/
+*.iml
+out/
+
+# ===== Node.js =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+dist/
+build/
+
+# ===== Java =====
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+
+# ===== Logs =====
+logs/
+*.log
+*.tmp
+
+# ===== Environment =====
+.env
+.env.*
+*.local
+
+# ===== Dependencies =====
+vendor/
+
+# ===== Misc =====
+coverage/
+.cache/
+*.swp
+
+
+
+mlruns/
+mlflow.db

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+      - name: mlflow
+        image: ghcr.io/mlflow/mlflow:v2.14.0
+        command:
+          - /bin/sh
+          - -c
+          - |
+            pip install boto3 botocore cryptography &&
+            mlflow server \
+            --backend-store-uri sqlite:////mlflow/mlflow.db \
+            --default-artifact-root s3://nexusml/models \
+            --host 0.0.0.0 \
+            --port 5000
+        ports:
+        - containerPort: 5000
+        env:
+        # Lấy từ ConfigMap
+        - name: MLFLOW_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: serving-config
+              key: MINIO_ENDPOINT
+        # Lấy từ Secret
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_USER
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: MINIO_ROOT_PASSWORD
+        volumeMounts:
+        - name: mlflow-storage
+          mountPath: /mlflow # Nơi lưu mlflow.db
+      volumes:
+      - name: mlflow-storage
+        persistentVolumeClaim:
+          claimName: mlflow-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-service # Tên DNS
+spec:
+  selector:
+    app: mlflow
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP

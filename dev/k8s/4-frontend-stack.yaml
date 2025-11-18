@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        # ================================================
+        # TODO: SỬA LẠI TÊN IMAGE CỦA BẠN
+        image: nbngoc1303/frontend:1.0
+        # ================================================
+        ports:
+        - containerPort: 7860
+        env:
+        - name: BACKEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: serving-config
+              key: BACKEND_URL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80 # Người dùng truy cập cổng 80 chuẩn
+      targetPort: 7860 # Chuyển vào cổng 7860 của Gradio
+  # type: LoadBalancer # 👈 Yêu cầu 1 IP public
+  type: NodePort  

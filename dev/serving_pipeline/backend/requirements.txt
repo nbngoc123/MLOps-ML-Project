@@ -1,0 +1,14 @@
+redis==5.2.1
+fastapi==0.115.12
+pydantic==2.11.2
+uvicorn==0.34.0
+pydantic-settings==2.8.1
+python-multipart==0.0.20
+numpy==2.1.1
+pillow==11.1.0
+python-dotenv==1.0.0
+s3fs==2024.6.1
+scikit-learn==1.5.1
+mlflow-skinny>=2.14.0
+pandas
+boto3
