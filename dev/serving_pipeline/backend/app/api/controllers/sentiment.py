@@ -1,11 +1,15 @@
-from mlflow.tracking import MlflowClient
-import joblib
-import s3fs
+import mlflow
 import os
 import logging
-from fastapi import HTTPException
+import joblib
+import s3fs
+import asyncio
+import pandas as pd
+import shutil
+from io import BytesIO
+from fastapi import HTTPException, UploadFile, File
 from pydantic import BaseModel
-
+from mlflow.tracking import MlflowClient
 # ========================
 # Config
 # ========================
@@ -33,97 +37,158 @@ fs = s3fs.S3FileSystem(
 
 vectorizer = None
 model = None
+is_model_ready = False
 
 class SentimentInput(BaseModel):
     text: str
 
 # ========================
-# 1. Hàm Load Model: Kết hợp MLflow Lookup + S3FS Download
+# 1. Hàm Load Model (Robust Version)
 # ========================
 async def load_sentiment_model(retries=3, delay=2):
-    global vectorizer, model
+    global vectorizer, model, is_model_ready
     
-    # Khởi tạo MLflow Client (Chỉ dùng để hỏi thông tin, không tải file)
     client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
     
     for attempt in range(1, retries+1):
         try:
-            # --- BƯỚC 1: Hỏi MLflow xem Run ID nào đang là Production ---
-            logger.info(f"[Attempt {attempt}] Asking MLflow for alias '@{ALIAS}'...")
-            try:
-                mv = client.get_model_version_by_alias(MODEL_NAME, ALIAS)
-                run_id = mv.run_id
-                logger.info(f"🎯 MLflow says: Production Run ID is {run_id}")
-            except Exception as e:
-                raise FileNotFoundError(f"Không tìm thấy model alias @{ALIAS} trên MLflow. Error: {e}")
-
-            # --- BƯỚC 2: Tự xây dựng đường dẫn MinIO dựa trên Run ID ---
-            # Cấu trúc chuẩn: bucket/models/<run_id>/artifacts/...
-            base_path = f"{MINIO_BUCKET}/models/{run_id}/artifacts"
+            logger.info(f"🔄 [Attempt {attempt}] Finding production model for '{MODEL_NAME}'...")
             
-            # Đường dẫn Model (Do mlflow.sklearn.log_model tạo ra folder 'model')
-            model_s3_path = f"{base_path}/model/model.pkl"
-            
-            # Đường dẫn Vectorizer (Do mlflow.log_artifact tạo ra folder 'artifacts')
-            # Dựa trên UI bạn gửi: artifacts/vectorizer.pkl
-            # => Full path: nexusml/models/.../artifacts/artifacts/vectorizer.pkl
-            vec_s3_path = f"{base_path}/artifacts/vectorizer.pkl"
+            # 1. Lấy Run ID từ Alias
+            mv = client.get_model_version_by_alias(MODEL_NAME, ALIAS)
+            run_id = mv.run_id
+            model_source = mv.source # e.g., s3://nexusml/models/.../artifacts/model
+            logger.info(f"🎯 Found Production Run ID: {run_id}")
 
-            # --- BƯỚC 3: Tải và Load bằng s3fs + joblib ---
+            # 2. Download Artifacts về thư mục tạm
+            # Lý do: Dùng mlflow download an toàn hơn tự mò đường dẫn S3 khi cấu trúc folder thay đổi
+            local_path = mlflow.artifacts.download_artifacts(run_id=run_id)
             
-            # A. Load Vectorizer
-            logger.info(f"Loading Vectorizer from MinIO: {vec_s3_path}")
-            if not fs.exists(vec_s3_path):
-                raise FileNotFoundError(f"Vectorizer not found at: {vec_s3_path}")
-                
-            with fs.open(vec_s3_path, 'rb') as f:
-                vectorizer = joblib.load(f)
-
-            # B. Load Model
-            logger.info(f"Loading Model from MinIO: {model_s3_path}")
-            if not fs.exists(model_s3_path):
-                raise FileNotFoundError(f"Model not found at: {model_s3_path}")
-
-            with fs.open(model_s3_path, 'rb') as f:
-                model = joblib.load(f)
+            # 3. Tìm file model.pkl và vectorizer.pkl (Đệ quy)
+            model_file = None
+            vec_file = None
             
-            logger.info("✅ Successfully loaded Model & Vectorizer (Hybrid Method)!")
+            for root, dirs, files in os.walk(local_path):
+                if "model.pkl" in files:
+                    model_file = os.path.join(root, "model.pkl")
+                if "vectorizer.pkl" in files:
+                    vec_file = os.path.join(root, "vectorizer.pkl")
+
+            if not model_file or not vec_file:
+                raise FileNotFoundError("❌ Không tìm thấy model.pkl hoặc vectorizer.pkl trong artifacts tải về!")
+
+            # 4. Load vào RAM
+            model = joblib.load(model_file)
+            vectorizer = joblib.load(vec_file)
+            is_model_ready = True
+            
+            logger.info(f"✅ Model Loaded Successfully from {local_path}")
+            
+            # Dọn dẹp folder tạm để tiết kiệm dung lượng
+            try: shutil.rmtree(local_path) 
+            except: pass
             return
 
         except Exception as e:
-            import asyncio
-            logger.warning(f"Load failed ({e}). Retrying in {delay}s...")
+            logger.warning(f"⚠️ Load failed ({e}). Retrying in {delay}s...")
+            is_model_ready = False
             if attempt < retries:
                 await asyncio.sleep(delay)
             else:
-                logger.error("Final failure loading model.")
-                raise HTTPException(status_code=500, detail=f"Cannot load model: {e}")
+                logger.error("❌ Final failure loading model.")
 
 # ========================
-# 2. API Endpoint
+# 2. API Endpoints
 # ========================
-async def predict_sentiment(data: SentimentInput):
-    global vectorizer, model
-    
-    if vectorizer is None or model is None:
+
+async def startup_event():
+    await load_sentiment_model()
+
+async def predict_single(data: SentimentInput):
+    """Dự đoán 1 câu text duy nhất"""
+    if not is_model_ready:
         await load_sentiment_model()
+        if not is_model_ready: raise HTTPException(503, "Model not ready")
 
     try:
-        # Transform
+        # Transform & Predict
         vec = vectorizer.transform([data.text])
-        
-        # Predict
         pred = model.predict(vec)[0]
         
         # Map label
         label_map = {0: "tiêu cực", 1: "tích cực", 2: "trung tính"}
         sentiment = label_map.get(int(pred), "unknown")
         
+        # Lấy confidence score nếu có
+        confidence = 0.0
+        if hasattr(model, "predict_proba"):
+            confidence = float(model.predict_proba(vec).max())
+
         return {
             "text": data.text,
             "sentiment": sentiment,
-            "run_source": "mlflow_lookup_s3_load"
+            "confidence": round(confidence, 4),
+            "run_source": "mlflow_production"
         }
     except Exception as e:
-        logger.error(f"Error predicting: {e}")
-        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+        logger.error(f"Error: {e}")
+        raise HTTPException(500, str(e))
+
+async def predict_batch(file: UploadFile = File(...)):
+    """
+    Upload file CSV -> Trả về JSON chứa dữ liệu đã phân loại.
+    Dành cho Frontend hiển thị bảng kết quả ngay lập tức.
+    """
+    if not is_model_ready:
+        await load_sentiment_model()
+        if not is_model_ready: raise HTTPException(503, "Model not ready")
+
+    try:
+        # 1. Đọc file CSV từ Upload
+        content = await file.read()
+        df = pd.read_csv(BytesIO(content))
+        
+        # Kiểm tra cột
+        text_col = next((col for col in ['text', 'comment', 'content'] if col in df.columns), None)
+        if not text_col:
+            raise HTTPException(400, "CSV phải chứa cột 'text', 'comment' hoặc 'content'")
+
+        logger.info(f"Processing batch of {len(df)} records...")
+
+        # 2. Batch Processing (Vectorization)
+        # Xử lý hàng loạt cực nhanh, không dùng loop
+        raw_text = df[text_col].astype(str).str.lower().fillna("")
+        X_vec = vectorizer.transform(raw_text)
+
+        # 3. Predict
+        predictions = model.predict(X_vec)
+        
+        # 4. Map Label & Confidence
+        label_map = {0: "tiêu cực", 1: "tích cực", 2: "trung tính"}
+        
+        # Gán kết quả vào DataFrame
+        df['prediction_code'] = predictions
+        if pd.api.types.is_numeric_dtype(df['prediction_code']):
+             df['sentiment'] = df['prediction_code'].map(label_map)
+        else:
+             df['sentiment'] = df['prediction_code'] # Trường hợp model trả về string sẵn
+
+        # Tính confidence
+        if hasattr(model, "predict_proba"):
+            probs = model.predict_proba(X_vec).max(axis=1)
+            df['confidence'] = probs.round(4)
+
+        # 5. Chuyển đổi DF thành List of Dicts để trả về JSON
+        # orient='records' tạo ra cấu trúc: [{"text": "...", "sentiment": "..."}, ...]
+        result_data = df.to_dict(orient="records")
+
+        return {
+            "filename": file.filename,
+            "total_rows": len(df),
+            "data": result_data,  # <--- TRẢ VỀ DATA ĐÃ GHÉP BẢNG
+            "run_source": "mlflow_production_batch"
+        }
+
+    except Exception as e:
+        logger.error(f"Batch error: {e}")
+        raise HTTPException(500, f"Lỗi xử lý file: {str(e)}")
