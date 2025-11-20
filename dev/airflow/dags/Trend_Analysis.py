@@ -106,7 +106,7 @@ def preprocess_trends(file_key: str):
 
     # --- 2. XỬ LÝ TEXT (Bỏ ký tự đặc biệt) ---
     # B1: Chuyển về chữ thường + ép kiểu string
-    df['clean_text'] = df['comment'].astype(str).str.lower()
+    df['clean_text'] = df['reviews.text'].astype(str).str.lower()
     
     # B2: Dùng Regex để loại bỏ ký tự đặc biệt
     # Pattern r'[^\w\s]': 

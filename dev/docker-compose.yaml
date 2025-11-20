@@ -82,8 +82,10 @@ x-airflow-common:
     
     # 2. Kết nối MLflow (dùng để log run và Model Registry)
     # MLFLOW_TRACKING_URI: http://${K8S_MLFLOW_HOST}:5000
-    MINIO_ENDPOINT: http://40.82.143.98:9000
-    MLFLOW_TRACKING_URI: http://40.82.143.98:5000
+    # MINIO_ENDPOINT: http://40.82.143.98:9000
+    # MLFLOW_TRACKING_URI: http://40.82.143.98:5000
+    MINIO_ENDPOINT: http://minio:9000
+    MLFLOW_TRACKING_URI: http://mlflow:5000
 
 
   volumes:
@@ -347,52 +349,57 @@ services:
       # ============================================
   # 🌟 MLflow Tracking Server
   # ============================================
-  # mlflow:
-  #   image: ghcr.io/mlflow/mlflow:v2.14.0
-  #   container_name: mlflow
-  #   environment:
-  #     BACKEND_STORE_URI: sqlite:///mlflow/mlflow.db
-  #     ARTIFACT_ROOT: s3://nexusml/models/
-  #     MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-  #     AWS_ACCESS_KEY_ID: minioadmin
-  #     AWS_SECRET_ACCESS_KEY: minioadmin
-  #   volumes:
-  #     - ./mlflow:/mlflow
-  #   ports:
-  #     - "5000:5000"   # MLflow UI
-  #   command: 
-  #     - /bin/sh
-  #     - -c
-  #     - |
-  #       pip install boto3 && 
-  #       mlflow server \
-  #       --backend-store-uri sqlite:///mlflow/mlflow.db \
-  #       --default-artifact-root s3://nexusml/models/ \
-  #       --host 0.0.0.0 \
-  #       --port 5000
-  #   restart: always
-  #   depends_on:
-  #     - minio
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.14.0
+    container_name: mlflow
+    environment:
+      BACKEND_STORE_URI: sqlite:///mlflow/mlflow.db
+      ARTIFACT_ROOT: s3://nexusml/models/
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    volumes:
+      - ./mlflow:/mlflow
+    ports:
+      - "5000:5000"   # MLflow UI
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        pip install boto3 && 
+        mlflow server \
+        --backend-store-uri sqlite:///mlflow/mlflow.db \
+        --default-artifact-root s3://nexusml/models/ \
+        --host 0.0.0.0 \
+        --port 5000
+    restart: always
+    depends_on:
+      - minio
 
   # # ============================================
   # # 🌩️ MinIO (S3-compatible object storage)
   # # ============================================
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: minio
-  #   environment:
-  #     MINIO_ROOT_USER: minioadmin
-  #     MINIO_ROOT_PASSWORD: minioadmin
-  #   command: server /data --console-address ":9001"
-  #   ports:
-  #     - "9000:9000"  # S3 API endpoint
-  #     - "9001:9001"  # Web console
-  #   volumes:
-  #     - minio_data:/data
-  #   restart: always
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"  # S3 API endpoint
+      - "9001:9001"  # Web console
+    volumes:
+      - minio_data:/data
+    restart: always
 
 
 volumes:
   postgres-db-volume:
-  # minio_data:
-  # mlflow_data:
+  minio_data:
+  mlflow_data:
+
+networks:
+  default:
+    external: true
+    name: house_prices_default

@@ -4,14 +4,14 @@ from ..controllers.sentiment import predict_single, predict_batch, SentimentInpu
 router = APIRouter()
 
 @router.post("/predict", summary="Dự đoán cảm xúc văn bản")
-async def predict_single(data: SentimentInput):
+async def predict_sentiment(data: SentimentInput):
     """
     Dự đoán cảm xúc (tích cực, tiêu cực, trung tính) của một đoạn văn bản.
     """
     return await predict_single(data)
 
-@router.post("/predict-batch", summary="Dự đoán cảm xúc văn bản")
-async def predict_batch(file: UploadFile = File(...)):
+@router.post("/predict_batch", summary="Dự đoán cảm xúc văn bản")
+async def predict_sentiment_b(file: UploadFile = File(...)):
     """
     Dự đoán cảm xúc (tích cực, tiêu cực, trung tính) của một đoạn văn bản.
     """

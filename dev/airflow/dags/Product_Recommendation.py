@@ -79,52 +79,58 @@ def extract_data():
 @task(dag=dag)
 def preprocess_recsys(file_key: str):
     """
-    Xử lý dữ liệu: Chọn cột, điền khuyết thiếu, Label Encode ID, gộp Text.
+    Xử lý dữ liệu cho Recommender System:
+    - Lấy các cột quan trọng nếu tồn tại (Linh hoạt hơn code cũ).
+    - Điền missing, Label Encode user/item
+    - Gộp các Text Feature thành full_description
     """
-    # 1. Đọc các cột quan trọng
-    usecols = [
-        'reviews.username', 'asins', 'reviews.rating', 
-        'reviews.text', 'reviews.title', 'name', 'manufacturer', 'categories'
-    ]
-    
-    # Xử lý trường hợp file thực tế có thể thiếu cột
-    df_raw = pd.read_csv(f"s3://{MINIO_BUCKET}/{file_key}", storage_options=get_storage_options())
-    existing_cols = [c for c in usecols if c in df_raw.columns]
-    df = df_raw[existing_cols].copy()
-    
-    # 2. Đổi tên cột cho dễ làm việc
-    rename_map = {
-        'reviews.username': 'user_id',
-        'asins': 'item_id',
-        'reviews.rating': 'rating',
-        'reviews.text': 'text',
-        'reviews.title': 'title'
+    candidate_cols = {
+        'user_id': ['reviews.username', 'user_id'],
+        'item_id': ['asins', 'item_id'],
+        'rating': ['reviews.rating', 'rating'],
+        'title': ['reviews.title', 'title'],
+        'text': ['reviews.text', 'text'],
+        'name': ['name'],
+        'manufacturer': ['manufacturer'],
+        'categories': ['categories']
     }
-    df.rename(columns=rename_map, inplace=True)
     
-    # 3. Xử lý Missing Data
+    # 2. Đọc file từ S3 và Chuẩn hóa tên cột
+    df_raw = pd.read_csv(f"s3://{MINIO_BUCKET}/{file_key}", storage_options=get_storage_options())
+    df = pd.DataFrame()
+    for key, options in candidate_cols.items():
+        # Tìm cột tồn tại đầu tiên
+        for col in options:
+            if col in df_raw.columns:
+                df[key] = df_raw[col]
+                break
+        else:
+            # Nếu cột không tồn tại, gán giá trị mặc định
+            if key in ['text', 'title', 'name', 'manufacturer', 'categories']:
+                df[key] = ''  # Text Feature thiếu → chuỗi rỗng
+            else:
+                df[key] = None  # User/Item/Rating thiếu → None
+
+    # 3. Drop các record thiếu user/item/rating
+    # Đây là bước quan trọng đã gây lỗi nếu item_id bị None
     df.dropna(subset=['user_id', 'item_id', 'rating'], inplace=True)
-    df.fillna('', inplace=True) # Điền chuỗi rỗng cho các cột text thiếu
     
-    # 4. Feature Engineering: Gộp thông tin Text & Metadata
-    # Ý tưởng: Gom tất cả đặc điểm mô tả sản phẩm và review vào 1 câu dài để model hiểu ngữ cảnh
+    # 4. Gộp các feature text thành full_description
     df['full_description'] = (
-        df['title'] + " " + 
-        df['text'] + " " + 
-        df['name'] + " " + 
-        df['manufacturer'] + " " + 
-        df['categories']
+        df['title'].astype(str) + " " + 
+        df['text'].astype(str) + " " + 
+        df['name'].astype(str) + " " + 
+        df['manufacturer'].astype(str) + " " + 
+        df['categories'].astype(str)
     ).str.lower()
-    
-    # 5. Label Encoding cho User và Item
-    # Cần lưu lại Encoder để sau này khi dự đoán thực tế (Inference) còn map lại được
+
+    # 5. Label Encoding cho user/item (Tương tự code cũ)
     le_user = LabelEncoder()
     le_item = LabelEncoder()
-    
     df['user_idx'] = le_user.fit_transform(df['user_id'].astype(str))
     df['item_idx'] = le_item.fit_transform(df['item_id'].astype(str))
-    
-    # Lưu Encoders
+
+    # 6. Lưu Encoders lên S3 (Tương tự code cũ)
     local_enc_dir = "/tmp/encoders"
     os.makedirs(local_enc_dir, exist_ok=True)
     joblib.dump(le_user, f"{local_enc_dir}/user_le.pkl")
@@ -133,9 +139,8 @@ def preprocess_recsys(file_key: str):
     fs = s3fs.S3FileSystem(client_kwargs={'endpoint_url': MINIO_ENDPOINT}, key=MINIO_ACCESS_KEY, secret=MINIO_SECRET_KEY)
     fs.put(f"{local_enc_dir}/user_le.pkl", f"{MINIO_BUCKET}/{USE_CASE_PREFIX}/encoders/user_le.pkl")
     fs.put(f"{local_enc_dir}/item_le.pkl", f"{MINIO_BUCKET}/{USE_CASE_PREFIX}/encoders/item_le.pkl")
-    
-    # 6. Lưu dữ liệu sạch
-    # Giữ lại: user_idx, item_idx, full_description (Text Feature), rating (Target)
+
+    # 7. Lưu dữ liệu đã xử lý
     clean_key = f"{USE_CASE_PREFIX}/processed/clean_hybrid.csv"
     df[['user_idx', 'item_idx', 'full_description', 'rating']].to_csv(
         f"s3://{MINIO_BUCKET}/{clean_key}", 

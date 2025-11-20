@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import api_router
-# from app.models.manager import ModelManager
+from app.services.model_manager import model_manager
+from app.models.inference import SentimentModel, TopicModel, EmailModel, RecSysModel, TrendModel
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,15 +16,21 @@ logger = logging.getLogger("ml-server")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Loading ML models...")
-    # await ModelManager.initialize()
-    logger.info("ML models loaded successfully!")
+    # Đăng ký các model classes với ModelManager
+    model_manager.register_model_class("sentiment", SentimentModel)
+    model_manager.register_model_class("topic", TopicModel)
+    model_manager.register_model_class("email", EmailModel)
+    model_manager.register_model_class("recsys", RecSysModel)
+    model_manager.register_model_class("trend", TrendModel)
+    logger.info("Model classes registered successfully!")
     yield
     logger.info("Shutting down, releasing resources...")
-    # await ModelManager.cleanup()
+    logger.info("Tắt ứng dụng, giải phóng tài nguyên...")
+    # ModelManager sẽ tự động cleanup khi ứng dụng dừng
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="API for serving YOLO and Stable Diffusion models",
+    description="API for serving ML models (Sentiment, Topic, Email, RecSys, Trend)",
     version="1.0.0",
     lifespan=lifespan,
 )

@@ -4,14 +4,14 @@ from ..controllers.email import predict_email_single, predict_email_batch, Email
 router = APIRouter()
 
 @router.post("/predict", summary="Dự đoán  văn bản")
-async def predict_email_single(data: EmailInput):
+async def predict_email(data: EmailInput):
     """
     .
     """
     return await predict_email_single(data)
 
-@router.post("/predict_email_batch", summary="Dự đoán văn bản")
-async def predict_email_batch(file: UploadFile = File(...)):
+@router.post("/predict_batch", summary="Dự đoán văn bản")
+async def predict_email_b(file: UploadFile = File(...)):
     """
     
     """

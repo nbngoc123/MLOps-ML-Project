@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import httpx
 import asyncio
+import os
+os.environ["GRADIO_TEMP_DIR"] = "/tmp/gradio"
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -66,7 +68,10 @@ async def sentiment_single(text):
 
 
 async def sentiment_batch(file):
+    if file is None:
+        return pd.DataFrame({"Lỗi": ["Chưa chọn file"]})
     return await send_csv_batch("/sentiment/predict_batch", file)
+
 
 
 # ========================
@@ -133,7 +138,7 @@ async def recsys_batch(file):
 # ========================
 
 async def trend_analysis(file):
-    return await send_csv_batch("/trend/analyze", file)
+    return await send_csv_batch("/trend/predict", file)
 
 
 # ========================
@@ -158,7 +163,8 @@ with gr.Blocks(title="NexusML AI Platform", theme=gr.themes.Soft()) as demo:
             s_file = gr.File()
             s_df = gr.DataFrame()
             gr.Button("Batch CSV").click(
-                lambda f: run_async(sentiment_batch, f),
+                # lambda f: run_async(sentiment_batch, f),
+                sentiment_batch,
                 inputs=s_file, outputs=s_df
             )
 
@@ -174,7 +180,8 @@ with gr.Blocks(title="NexusML AI Platform", theme=gr.themes.Soft()) as demo:
             e_file = gr.File()
             e_df = gr.DataFrame()
             gr.Button("Batch CSV").click(
-                lambda f: run_async(email_batch, f),
+                # lambda f: run_async(email_batch, f),
+                email_batch,
                 inputs=e_file, outputs=e_df
             )
 

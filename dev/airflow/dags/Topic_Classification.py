@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 DAG_ID = "topic_classifier_dag"
 MINIO_BUCKET = "nexusml"
 USE_CASE_PREFIX = "topic_classifier"
+TOPIC_MODEL_NAME = "Nexus_Topic_Classifier"
 # (Giữ nguyên các biến môi trường MinIO/MLflow như file trên)
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
@@ -98,7 +99,8 @@ def preprocess_topic(file_key: str):
 def train_topic_model(clean_key: str):
     # 1. Đọc Parquet
     path = f"s3://{MINIO_BUCKET}/{clean_key}"
-    df = pd.read_parquet(path, storage_options=get_storage_options())
+    
+    df = pd.read_csv(path, storage_options=get_storage_options())
 
     # 2. Safety Check (Copy từ hàm trên)
     if len(df) < 5 or df['topic'].nunique() < 2:

@@ -4,14 +4,14 @@ from ..controllers.topic import TopicInput, predict_topic_single, predict_topic_
 router = APIRouter()
 
 @router.post("/predict", summary="Dự đoán  văn bản")
-async def predict_topic_single(data: TopicInput):
+async def predict_topic(data: TopicInput):
     """
     .
     """
     return await predict_topic_single(data)
 
-@router.post("/predict_topic_batch", summary="Dự đoán văn bản")
-async def predict_topic_batch(file: UploadFile = File(...)):
+@router.post("/predict_batch", summary="Dự đoán văn bản")
+async def predict_topic_b(file: UploadFile = File(...)):
     """
     
     """

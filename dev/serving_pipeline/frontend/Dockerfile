@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy requirements và cài đặt
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
+RUN mkdir -p /tmp/gradio
 # Copy toàn bộ code
 COPY . .
 

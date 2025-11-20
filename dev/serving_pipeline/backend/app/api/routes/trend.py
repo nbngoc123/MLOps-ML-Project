@@ -1,12 +1,11 @@
 from fastapi import APIRouter, UploadFile, File
-from ..controllers.topic import TopicInput, predict_topic_single, predict_topic_batch
+from ..controllers.trend import analyze_trend_csv
 
 router = APIRouter()
 
 @router.post("/predict", summary="Dự đoán  văn bản")
-async def analyze_trend_csv(data: TopicInput):
+async def analyze_trend(file: UploadFile = File(...)):
     """
-    .
     """
-    return await analyze_trend_csv(data)
+    return await analyze_trend_csv(file)
 
