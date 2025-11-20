@@ -16,7 +16,7 @@ spec:
       - name: backend
         # ================================================
         # TODO: SỬA LẠI TÊN IMAGE CỦA BẠN
-        image: nbngoc1303/backend:1.0
+        image: nbngoc1303/backend:2.0
         # ================================================
         ports:
         - containerPort: 8000

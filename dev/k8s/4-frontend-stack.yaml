@@ -16,7 +16,7 @@ spec:
       - name: frontend
         # ================================================
         # TODO: SỬA LẠI TÊN IMAGE CỦA BẠN
-        image: nbngoc1303/frontend:1.0
+        image: nbngoc1303/frontend:2.0
         # ================================================
         ports:
         - containerPort: 7860
