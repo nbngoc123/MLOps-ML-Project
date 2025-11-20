@@ -1,11 +1,18 @@
-from fastapi import APIRouter
-from ..controllers.sentiment import predict_sentiment, SentimentInput
+from fastapi import APIRouter, UploadFile, File
+from ..controllers.sentiment import predict_single, predict_batch, SentimentInput
 
 router = APIRouter()
 
 @router.post("/predict", summary="Dự đoán cảm xúc văn bản")
-async def sentiment_prediction(data: SentimentInput):
+async def predict_single(data: SentimentInput):
     """
     Dự đoán cảm xúc (tích cực, tiêu cực, trung tính) của một đoạn văn bản.
     """
-    return await predict_sentiment(data)
+    return await predict_single(data)
+
+@router.post("/predict-batch", summary="Dự đoán cảm xúc văn bản")
+async def predict_batch(file: UploadFile = File(...)):
+    """
+    Dự đoán cảm xúc (tích cực, tiêu cực, trung tính) của một đoạn văn bản.
+    """
+    return await predict_batch(file)
