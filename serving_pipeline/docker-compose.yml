@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    environment:
+      # 👇 MinIO đang chạy bên mạng kia, ta gọi đúng tên container của nó
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: nexusml
+    ports:
+      - "8000:8000"
+    # 👇 QUAN TRỌNG: Tham gia vào mạng chung
+    networks:
+      - my_shared_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    environment:
+      # Frontend gọi backend qua tên service trong cùng mạng
+      BACKEND_URL: http://backend:8000/api
+    depends_on:
+      - backend
+    ports:
+      - "7860:7860"
+    # 👇 QUAN TRỌNG: Tham gia vào mạng chung
+    networks:
+      - my_shared_network
+    restart: unless-stopped
+
+# 👇 CẤU HÌNH MẠNG KẾT NỐI
+networks:
+  my_shared_network:
+    external: true
+    name: house_prices_default  # 👈 Tên mạng bạn vừa tìm thấy
