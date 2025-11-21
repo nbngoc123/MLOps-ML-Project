@@ -37,3 +37,8 @@ scrape_configs:
       - source_labels: [__name__]
         regex: "(inference_count|inference_latency_seconds.*|drift_.*|evidently_.*|vqa_.*|process_vram_memory_GB|image_brightness.*)"
         action: keep
+
+  - job_name: "airflow"
+    static_configs:
+      - targets: ["airflow-statsd-exporter:8125"] 
+    scrape_interval: 15s

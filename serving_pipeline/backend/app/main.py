@@ -1,11 +1,18 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes import api_router
 from app.services.model_manager import model_manager
 from app.models.inference import SentimentModel, TopicModel, EmailModel, RecSysModel, TrendModel
+from app.core.monitoring import (
+    PrometheusMiddleware, 
+    update_system_metrics,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+)
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +49,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(PrometheusMiddleware())
 
+@app.get("/metrics")
+async def metrics():
+    """Endpoint để Prometheus scrape dữ liệu"""
+    update_system_metrics()
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
 if __name__ == "__main__":
