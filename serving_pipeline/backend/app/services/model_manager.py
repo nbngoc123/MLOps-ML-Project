@@ -55,23 +55,15 @@ class ModelManager:
             # Tạo một instance mới của model
             model_instance = model_class(model_name, model_version)
 
-            # Tải model từ MLflow Registry
-            # Dùng registered model name và version
-            model_uri = f"models:/{model_name}/{model_version}"
+            # Gọi phương thức load() của model instance
             try:
-                # MLflow sẽ tự động tải model về thư mục cache cục bộ
-                mlflow_model = mlflow.pyfunc.load_model(model_uri)
-                model_instance.model = mlflow_model # Gán model đã tải vào instance
-                logger.info(f"Model '{model_name}' version '{model_version}' loaded successfully from MLflow.")
+                await model_instance.load()
+                logger.info(f"Model '{model_name}' version '{model_version}' loaded successfully through model.load().")
             except Exception as e:
-                logger.error(f"Error loading model '{model_uri}' from MLflow: {e}")
+                logger.error(f"Error loading model '{model_name}' version '{model_version}': {e}")
                 raise
 
-            # Gán model đã tải vào instance của BaseModel, sau đó các lớp con sẽ xử lý nó.
-            # Lưu ý: Với mlflow.pyfunc.load_model, model đã được tải hoàn chỉnh.
-            # Phương thức load() trong BaseModel của chúng ta có thể được điều chỉnh nếu cần.
-            # Trong trường hợp này, chúng ta gán trực tiếp kết quả từ mlflow.pyfunc.load_model vào model_instance.model.
-            # Các lớp model cụ thể (YOLOv8, StableDiffusion) sẽ cần biết cách sử dụng mlflow_model này.
+            # ModelManager sẽ không tự load model nữa mà để cho model instance tự load thông qua phương thức load() của chúng.
 
             # Thêm model vào bộ nhớ đệm và quản lý giới hạn kích thước
             if len(self.cache) >= settings.MAX_CACHED_MODELS:

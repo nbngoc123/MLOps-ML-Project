@@ -40,4 +40,4 @@ services:
 networks:
   my_shared_network:
     external: true
-    name: house_prices_default  # 👈 Tên mạng bạn vừa tìm thấy
+    name: house_prices_default  

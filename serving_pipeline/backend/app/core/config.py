@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = os.getenv("MINIO_BUCKET", "nexusml")
 
     # Model management configuration
-    MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
     MODEL_BASE_PATH: str = os.getenv("MODEL_BASE_PATH", "./models_cache") # Local cache for models
     MAX_CACHED_MODELS: int = int(os.getenv("MAX_CACHED_MODELS", 3)) # Max number of models to keep in cache
 

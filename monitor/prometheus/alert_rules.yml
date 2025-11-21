@@ -1,0 +1,279 @@
+groups:
+  - name: evidently_drift_alerts
+    interval: 30s
+    rules:
+      # Dataset-level drift detection
+      - alert: EvidentlyDatasetDriftDetected
+        expr: evidently_dataset_drift == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "Dataset drift detected by Evidently"
+          description: "Evidently has detected statistical drift in the dataset. Current drift share: {{ $value }}. This may indicate model performance degradation."
+          
+      # High drift share alert
+      - alert: EvidentlyHighDriftShare
+        expr: evidently_drift_share > 0.3
+        for: 3m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "High proportion of features showing drift"
+          description: "{{ $value | humanizePercentage }} of features are drifting. Consider retraining the model or updating the reference data."
+          
+      # Critical drift share
+      - alert: EvidentlyCriticalDriftShare
+        expr: evidently_drift_share > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "CRITICAL: Over 50% of features drifting"
+          description: "{{ $value | humanizePercentage }} of features showing drift. Immediate action required - model may be unreliable."
+          
+      # Brightness drift
+      - alert: BrightnessDriftHigh
+        expr: evidently_brightness_drift_score > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "High brightness drift detected"
+          description: "Image brightness distribution has drifted significantly (score: {{ $value }}). Input images may have different characteristics."
+          
+      # Confidence drift
+      - alert: ConfidenceDriftHigh
+        expr: evidently_confidence_drift_score > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "Model confidence drift detected"
+          description: "Detection confidence scores have drifted (score: {{ $value }}). Model may be less certain about predictions."
+          
+      # Multiple features drifting
+      - alert: MultipleFeaturesDrifting
+        expr: evidently_num_drifted_features >= 3
+        for: 5m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "Multiple features showing drift"
+          description: "{{ $value }} features are currently drifting. Data distribution may have changed significantly."
+
+  - name: model_performance_alerts
+    interval: 30s
+    rules:
+      # High inference latency
+      - alert: HighInferenceLatency
+        expr: histogram_quantile(0.95, rate(inference_latency_seconds_bucket[5m])) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: performance
+        annotations:
+          summary: "High inference latency detected"
+          description: "95th percentile inference latency is {{ $value }}s. Normal is < 2s."
+          
+      # Very high inference latency
+      - alert: CriticalInferenceLatency
+        expr: histogram_quantile(0.95, rate(inference_latency_seconds_bucket[5m])) > 5.0
+        for: 2m
+        labels:
+          severity: critical
+          component: ml_model
+          alert_type: performance
+        annotations:
+          summary: "CRITICAL: Inference latency extremely high"
+          description: "95th percentile inference latency is {{ $value }}s. Service may be degraded."
+          
+      # Low inference rate (possible service issue)
+      - alert: LowInferenceRate
+        expr: rate(inference_count_total[5m]) < 0.01
+        for: 10m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: availability
+        annotations:
+          summary: "Very low inference rate"
+          description: "Inference rate is {{ $value }} req/s. Service may not be receiving requests."
+          
+      # Embedding drift (cosine similarity)
+      - alert: HighEmbeddingDrift
+        expr: drift_embedding_distance > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: ml_model
+          alert_type: drift
+        annotations:
+          summary: "High embedding drift detected"
+          description: "Cosine similarity drift score is {{ $value }}. Input data characteristics may have changed."
+          
+      # Image brightness anomaly
+      - alert: AbnormalImageBrightness
+        expr: drift_image_brightness < 50 or drift_image_brightness > 220
+        for: 5m
+        labels:
+          severity: info
+          component: data_quality
+          alert_type: quality
+        annotations:
+          summary: "Unusual image brightness detected"
+          description: "Image brightness is {{ $value }}, which is outside normal range [50-220]."
+
+  - name: system_health_alerts
+    interval: 30s
+    rules:
+      # GPU memory usage
+      - alert: HighGPUMemoryUsage
+        expr: process_vram_memory_GB > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+          alert_type: resource
+        annotations:
+          summary: "High GPU memory usage"
+          description: "GPU memory usage is {{ $value }}GB. May cause OOM errors."
+          
+      # Backend service down
+      - alert: BackendServiceDown
+        expr: up{job="yolo_backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: infrastructure
+          alert_type: availability
+        annotations:
+          summary: "YOLO Backend service is down"
+          description: "The YOLO backend service has been down for over 1 minute."
+
+  - name: vqa_drift_alerts
+    interval: 30s
+    rules:
+      # VQA Dataset-level drift detection
+      - alert: VQADatasetDriftDetected
+        expr: vqa_evidently_dataset_drift == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: vqa_model
+          alert_type: drift
+        annotations:
+          summary: "VQA dataset drift detected"
+          description: "Evidently detected drift in VQA dataset. Current drift share: {{ query \"vqa_evidently_drift_share\" }}. Model performance may degrade."
+          
+      # VQA High drift share alert
+      - alert: VQAHighDriftShare
+        expr: vqa_evidently_drift_share > 0.3
+        for: 3m
+        labels:
+          severity: warning
+          component: vqa_model
+          alert_type: drift
+        annotations:
+          summary: "High VQA feature drift"
+          description: "{{ $value | humanizePercentage }} of VQA features are drifting. Review input data quality."
+          
+      # VQA Critical drift share
+      - alert: VQACriticalDriftShare
+        expr: vqa_evidently_drift_share > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: vqa_model
+          alert_type: drift
+        annotations:
+          summary: "CRITICAL: VQA model experiencing severe drift"
+          description: "{{ $value | humanizePercentage }} of VQA features showing drift. Immediate action required."
+          
+      # VQA Question length drift
+      - alert: VQAQuestionLengthDrift
+        expr: vqa_evidently_question_length_drift_score > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          component: vqa_model
+          alert_type: drift
+        annotations:
+          summary: "VQA question length distribution drift"
+          description: "Question length patterns have changed (score: {{ $value }}). Users may be asking different types of questions."
+          
+      # VQA Answer length drift
+      - alert: VQAAnswerLengthDrift
+        expr: vqa_evidently_answer_length_drift_score > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          component: vqa_model
+          alert_type: drift
+        annotations:
+          summary: "VQA answer length distribution drift"
+          description: "Answer length patterns have changed (score: {{ $value }}). Model response behavior may have shifted."
+          
+      # VQA Multiple features drifting
+      - alert: VQAMultipleFeaturesDrifting
+        expr: vqa_evidently_num_drifted_features >= 3
+        for: 5m
+        labels:
+          severity: warning
+          component: vqa_model
+          alert_type: drift
+        annotations:
+          summary: "Multiple VQA features drifting"
+          description: "{{ $value }} VQA features are drifting. Significant data distribution change detected."
+
+  - name: vqa_performance_alerts
+    interval: 30s
+    rules:
+      # VQA High inference latency
+      - alert: VQAHighInferenceLatency
+        expr: histogram_quantile(0.95, rate(vqa_inference_latency_seconds_bucket[5m])) > 3.0
+        for: 3m
+        labels:
+          severity: warning
+          component: vqa_model
+          alert_type: performance
+        annotations:
+          summary: "VQA high inference latency"
+          description: "95th percentile VQA latency is {{ $value }}s. Normal is < 3s."
+          
+      # VQA Critical latency
+      - alert: VQACriticalInferenceLatency
+        expr: histogram_quantile(0.95, rate(vqa_inference_latency_seconds_bucket[5m])) > 10.0
+        for: 2m
+        labels:
+          severity: critical
+          component: vqa_model
+          alert_type: performance
+        annotations:
+          summary: "CRITICAL: VQA latency extremely high"
+          description: "95th percentile VQA latency is {{ $value }}s. Service severely degraded."
+          
+      # VQA Low inference rate
+      - alert: VQALowInferenceRate
+        expr: rate(vqa_inference_count_total[5m]) < 0.01
+        for: 10m
+        labels:
+          severity: info
+          component: vqa_model
+          alert_type: availability
+        annotations:
+          summary: "VQA low usage"
+          description: "VQA inference rate is {{ $value }} req/s. Service may not be receiving requests."

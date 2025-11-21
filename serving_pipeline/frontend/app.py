@@ -107,7 +107,7 @@ async def topic_single(text):
     if "error" in result:
         return f"❌ {result['error']}"
 
-    return f"Chủ đề: {result['topic']} (Conf: {result['confidence']:.2%})"
+    return f"Chủ đề: {result['topic']}"
 
 
 async def topic_batch(file):
