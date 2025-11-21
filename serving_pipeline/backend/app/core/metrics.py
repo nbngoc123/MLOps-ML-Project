@@ -17,7 +17,10 @@ from app.core.monitoring import (
     TOPIC_PREDICTION_COUNT,
     
     # Trend metrics
-    TREND_PROCESSING_TIME
+    TREND_PROCESSING_TIME,
+
+    MODEL_LOAD_DURATION, MODEL_LOAD_STATUS,
+    BATCH_PROCESSING_SIZE, BATCH_PROCESSING_LATENCY
 )
 import time
 import logging
@@ -127,45 +130,39 @@ def record_trend_metrics(processing_time: float):
         logger.error(f"Error recording trend metrics: {e}")
 
 def record_batch_processing_metrics(model_type: str, batch_size: int, processing_time: float, success: bool = True):
-    """Gọi hàm này sau khi xử lý batch predictions"""
+    """Ghi nhận metrics xử lý batch"""
     try:
         # Validate inputs
-        if not isinstance(batch_size, int) or batch_size <= 0:
-            logger.warning(f"Invalid batch_size value: {batch_size}")
-            batch_size = 1
+        if batch_size <= 0: batch_size = 1
+        if processing_time < 0: processing_time = 0.0
         
-        if not isinstance(processing_time, (int, float)) or processing_time < 0:
-            logger.warning(f"Invalid processing_time value: {processing_time}")
-            processing_time = 0.0
+        if success:
+            BATCH_PROCESSING_SIZE.labels(model_type=model_type).observe(batch_size)
+            BATCH_PROCESSING_LATENCY.labels(model_type=model_type).observe(processing_time)
         
-        if not isinstance(success, bool):
-            logger.warning(f"Invalid success value: {success}")
-            success = True
-        
-        # Calculate throughput (records per second)
         throughput = batch_size / processing_time if processing_time > 0 else 0
-        
-        logger.info(f"Batch processing metrics - Model: {model_type}, Size: {batch_size}, "
-                   f"Time: {processing_time:.2f}s, Success: {success}, "
-                   f"Throughput: {throughput:.2f} records/sec")
+        logger.info(f"Batch metrics - Model: {model_type}, Size: {batch_size}, Time: {processing_time:.2f}s")
         
     except Exception as e:
-        logger.error(f"Error recording batch processing metrics: {e}")
+        logger.error(f"Error recording batch metrics: {e}")
+
 
 def record_model_load_metrics(model_type: str, load_time: float, success: bool = True):
-    """Gọi hàm này sau khi load model"""
+    """Ghi nhận metrics load model"""
     try:
-        # Validate inputs
-        if not isinstance(load_time, (int, float)) or load_time < 0:
-            logger.warning(f"Invalid load_time value: {load_time}")
-            load_time = 0.0
-        
-        if not isinstance(success, bool):
-            logger.warning(f"Invalid success value: {success}")
-            success = True
+        if load_time < 0: load_time = 0.0
         
         status = "success" if success else "failed"
-        logger.info(f"Model load metrics - Model: {model_type}, Load time: {load_time:.2f}s, Status: {status}")
+        
+        # GỬI LÊN PROMETHEUS ---
+        MODEL_LOAD_STATUS.labels(model_type=model_type, status=status).inc()
+        
+        if success:
+            MODEL_LOAD_DURATION.labels(model_type=model_type).set(load_time)
+        
+        logger.info(f"Model load metrics - Model: {model_type}, Time: {load_time:.2f}s, Status: {status}")
         
     except Exception as e:
-        logger.error(f"Error recording model load metrics: {e}")
+        logger.error(f"Error recording load metrics: {e}")
+
+

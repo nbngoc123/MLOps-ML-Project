@@ -13,4 +13,5 @@ s3fs==2024.6.1
 scikit-learn==1.7.2
 mlflow-skinny>=2.14.0
 pandas
-boto3
+boto3==1.28.0
+minio==7.1.13

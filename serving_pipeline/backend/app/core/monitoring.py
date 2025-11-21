@@ -75,6 +75,31 @@ TREND_PROCESSING_TIME = Histogram(
     "Time taken to process time-series data"
 )
 
+# A. Model Loading Metrics (Để theo dõi thời gian khởi động model)
+MODEL_LOAD_DURATION = Gauge(
+    "model_load_duration_seconds", 
+    "Time taken to load the model into memory", 
+    ["model_type"]  # sentiment, email, recsys...
+)
+MODEL_LOAD_STATUS = Counter(
+    "model_load_total",
+    "Total model load attempts",
+    ["model_type", "status"] # status: success, failed
+)
+
+# B. Batch Processing Metrics (Để theo dõi hiệu năng xử lý file lớn)
+BATCH_PROCESSING_SIZE = Histogram(
+    "batch_processing_size_records",
+    "Number of records in a batch request",
+    ["model_type"],
+    buckets=[10, 50, 100, 500, 1000, 5000]
+)
+BATCH_PROCESSING_LATENCY = Histogram(
+    "batch_processing_seconds",
+    "Time taken to process a batch request",
+    ["model_type"]
+)
+
 # --- 4. INFRASTRUCTURE DEPENDENCY HEALTH ---
 REDIS_CONNECTED = Gauge("infra_redis_connected", "1 if Redis is connected, 0 otherwise")
 MINIO_CONNECTED = Gauge("infra_minio_connected", "1 if MinIO is connected, 0 otherwise")

@@ -14,31 +14,42 @@ alerting:
         - targets: ["alertmanager:9093"]
 
 scrape_configs:
+  # 1. Prometheus self-monitoring (Giữ nguyên)
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
 
-  # - job_name: "loki"
-  #   static_configs:
-  #     - targets: ["loki:3100"]
-  
+  # 2. NexusML Backend API (QUAN TRỌNG NHẤT - Đã gộp hết vào đây)
+  - job_name: "nexusml-backend"
+    metrics_path: "/metrics"          # Endpoint duy nhất của bạn
+    scrape_interval: 5s               # Lấy mẫu nhanh cho API
+    scrape_timeout: 4s
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          service: "nexusml"          # Gán nhãn thủ công để dễ query
+          environment: "production"
+          instance: "backend-1"
+
+  # 3. Node Exporter (Giữ nguyên vì chạy port 9100 khác backend)
   - job_name: "node_exporter"
     static_configs:
       - targets: ["node_exporter:9100"]
+    scrape_interval: 15s
 
-  - job_name: "mlops_backend"
-    metrics_path: "/metrics"
-    static_configs:
-      - targets: ["mlops-backend:8000"]
-    scrape_interval: 5s
-    scrape_timeout: 4s
-    metric_relabel_configs:
-      # Keep all inference and drift metrics
-      - source_labels: [__name__]
-        regex: "(inference_count|inference_latency_seconds.*|drift_.*|evidently_.*|vqa_.*|process_vram_memory_GB|image_brightness.*)"
-        action: keep
-
+  # 4. Các service phụ trợ khác (Giữ nguyên nếu bạn vẫn đang dùng)
   - job_name: "airflow"
     static_configs:
-      - targets: ["airflow-statsd-exporter:8125"] 
+      - targets: ["airflow-statsd-exporter:8125"]
     scrape_interval: 15s
+
+  - job_name: "mlflow"
+    static_configs:
+      - targets: ["mlflow:5000"]
+    scrape_interval: 30s
+    metrics_path: "/metrics"
+
+  - job_name: "model_collectors"
+    static_configs:
+      - targets: ["model-monitor:8080"]
+    scrape_interval: 10s

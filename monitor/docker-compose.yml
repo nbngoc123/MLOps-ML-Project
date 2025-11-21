@@ -101,6 +101,8 @@ services:
       - "9100:9100"
     pid: host
     restart: unless-stopped
+
+    # dùng "sudo mount --make-rshared /" để cho phép mount
     volumes:
       - '/:/host:ro,rslave'
     networks:
