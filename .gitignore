@@ -70,3 +70,5 @@ mlruns/
 mlflow.db
 
 # airflow/dags
+
+minio-data/
