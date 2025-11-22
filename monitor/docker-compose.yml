@@ -10,16 +10,10 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--web.enable-lifecycle"
     restart: always
     networks: 
       - my_shared_network
-    logging:
-      driver: loki
-      options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+    # ĐÃ XÓA LOGGING DRIVER
 
   alertmanager:
     image: prom/alertmanager
@@ -31,23 +25,14 @@ services:
       - alertmanager-data:/alertmanager
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
     restart: always
     networks:
       - my_shared_network
-    logging:
-      driver: loki
-      options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+    # ĐÃ XÓA LOGGING DRIVER
 
   grafana:
     image: grafana/grafana
     container_name: mlops-grafana
-    healthcheck:
-      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     ports:
       - "3000:3000"
     volumes:
@@ -58,39 +43,46 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
     depends_on:
       - prometheus
+      - loki
     restart: always
     networks:
       - my_shared_network
-    logging:
-      driver: loki
-      options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+    # ĐÃ XÓA LOGGING DRIVER
 
+  # --- LOKI SERVICE ---
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.4.1
     container_name: mlops-loki
     volumes:
+      # Đảm bảo file config đã tải ở Bước 1 nằm đúng chỗ này
       - ./loki/config.yml:/etc/loki/local-config.yaml
       - loki-data:/loki
-    healthcheck:
-      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    logging:
-      driver: loki
-      options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
     ports:
       - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
     networks:
       - my_shared_network
+    # ĐÃ XÓA LOGGING DRIVER (Loki không cần log chính nó vào nó theo cách này)
 
+  # --- PROMTAIL SERVICE (MỚI - Để thu thập log) ---
+  promtail:
+    image: grafana/promtail:3.4.1
+    container_name: mlops-promtail
+    volumes:
+      # File config tải ở Bước 1
+      - ./promtail/config.yml:/etc/promtail/config.yml
+      # Mount socket docker để lấy tên container
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount thư mục log của máy host để đọc log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - my_shared_network
 
   node_exporter:
     image: quay.io/prometheus/node-exporter:latest
@@ -101,8 +93,6 @@ services:
       - "9100:9100"
     pid: host
     restart: unless-stopped
-
-    # dùng "sudo mount --make-rshared /" để cho phép mount
     volumes:
       - '/:/host:ro,rslave'
     networks:
