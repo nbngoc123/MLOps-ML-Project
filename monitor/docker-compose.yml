@@ -16,10 +16,10 @@ services:
     restart: always
     networks: 
       - my_shared_network
-    # logging:
-    #   driver: loki
-    #   options:
-    #     loki-url: "http://localhost:3100/loki/api/v1/push"
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
 
   alertmanager:
     image: prom/alertmanager
@@ -35,10 +35,10 @@ services:
     restart: always
     networks:
       - my_shared_network
-    # logging:
-    #   driver: loki
-    #   options:
-    #     loki-url: "http://localhost:3100/loki/api/v1/push"
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
 
   grafana:
     image: grafana/grafana
@@ -59,37 +59,37 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
-      # - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
     depends_on:
       - prometheus
     restart: always
     networks:
       - my_shared_network
-    # logging:
-    #   driver: loki
-    #   options:
-    #     loki-url: "http://localhost:3100/loki/api/v1/push"
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
 
-  # loki:
-  #   image: grafana/loki:latest
-  #   container_name: mlops-loki
-  #   volumes:
-  #     - ./loki/config.yml:/etc/loki/local-config.yaml
-  #     - loki-data:/loki
-  #   healthcheck:
-  #     test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: loki
-  #     options:
-  #       loki-url: "http://localhost:3100/loki/api/v1/push"
-  #   ports:
-  #     - "3100:3100"
-  #   networks:
-  #     - my_shared_network
+  loki:
+    image: grafana/loki:latest
+    container_name: mlops-loki
+    volumes:
+      - ./loki/config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+    ports:
+      - "3100:3100"
+    networks:
+      - my_shared_network
 
 
   node_exporter:
@@ -112,7 +112,7 @@ volumes:
   prometheus-data:
   alertmanager-data:
   grafana-data:
-  # loki-data:
+  loki-data:
 
 networks:
   my_shared_network:
