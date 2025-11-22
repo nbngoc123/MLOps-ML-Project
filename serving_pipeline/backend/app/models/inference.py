@@ -57,6 +57,58 @@ def df_to_json_safe(df: pd.DataFrame) -> List[Dict[str, Any]]:
     df_clean = df.where(pd.notnull(df), None)
     df_clean = df_clean.replace([np.inf, -np.inf], None)
     return df_clean.to_dict(orient="records")
+
+def calculate_confidence(model, data, is_batch=False):
+    """
+    Tính confidence score an toàn cho cả Batch (nhiều dòng) và Single (1 dòng).
+    Xử lý được cả trường hợp model trả về 1D array (Binary) hoặc 2D array (Multi-class).
+    """
+    # 1. Kiểm tra xem model có tính được xác suất không
+    if hasattr(model, "predict_proba"):
+        try:
+            probs = model.predict_proba(data)
+        except Exception:
+            # Fallback nếu method tồn tại nhưng gọi bị lỗi
+            return None if not is_batch else [None] * len(data)
+    elif hasattr(model, "_model_impl") and hasattr(model._model_impl, "predict_proba"):
+         try:
+            probs = model._model_impl.predict_proba(data)
+         except Exception:
+            return None if not is_batch else [None] * len(data)
+    else:
+        # Không hỗ trợ xác suất
+        return 0.0 if not is_batch else [0.0] * len(data)
+
+    # 2. Chuẩn hóa sang Numpy Array để dễ xử lý
+    probs = np.array(probs)
+
+    # 3. Xử lý LOGIC TÍNH TOÁN
+    try:
+        # TRƯỜNG HỢP A: Batch (Dự đoán nhiều dòng)
+        if is_batch:
+            # Nếu ra mảng 1 chiều (Vd: [0.9, 0.1]) -> Đây là xác suất class Positive
+            if probs.ndim == 1:
+                # Độ tự tin = Max(p, 1-p). Ví dụ p=0.1 -> tự tin là 0.9 (cho class 0)
+                return np.maximum(probs, 1 - probs)
+            
+            # Nếu ra mảng 2 chiều chuẩn (N rows x M classes)
+            else:
+                return np.max(probs, axis=1)
+
+        # TRƯỜNG HỢP B: Single (Dự đoán 1 dòng)
+        else:
+            # Nếu input data là list 1 phần tử, probs thường ra mảng 2 chiều [1, n_class]
+            if probs.ndim == 2:
+                return float(np.max(probs[0]))
+            # Nếu ra 1 chiều (ít gặp khi predict 1 dòng nhưng vẫn có thể)
+            elif probs.ndim == 1:
+                return float(np.max(probs))
+            else:
+                return float(probs) # Fallback cuối cùng
+                
+    except Exception as e:
+        logger.warning(f"Error calculating confidence metrics: {e}")
+        return 0.0 if not is_batch else [0.0] * len(data)
 # ------------------------------------------
 
 class TopicModel(BaseModel):
@@ -70,7 +122,7 @@ class TopicModel(BaseModel):
             logger.info(f"Loading topic model: {self.model_name} v{self.model_version}")
             mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
             model_uri = f"models:/{self.model_name}@production"
-            self.model = mlflow.pyfunc.load_model(model_uri)
+            self.model = mlflow.sklearn.load_model(model_uri)
             
             # Tính thời gian thực
             load_duration = time.time() - start_time
@@ -89,11 +141,13 @@ class TopicModel(BaseModel):
         try:
             text_clean = str(data['text']).strip().lower()
             prediction = self.model.predict([text_clean])[0]
+            confidence = calculate_confidence(self.model, [text_clean], is_batch=False)
             record_topic_metrics(str(prediction))
             
             return {
                 "text": data['text'],
                 "topic": prediction,
+                "confidence": safe_float(confidence),
                 "run_source": "mlflow_production"
             }
         except Exception as e:
@@ -116,6 +170,11 @@ class TopicModel(BaseModel):
             predictions = self.model.predict(raw_text)
             df['topic'] = predictions
             
+            # TÍNH CONFIDENCE BATCH
+            confidences = calculate_confidence(self.model, raw_text, is_batch=True)
+            # Round số 
+            df['confidence'] = np.round(confidences, 4) if confidences is not None else 0.0
+
             processing_time = time.time() - start_time
             record_batch_processing_metrics("topic", len(df), processing_time, True)
             
@@ -145,7 +204,14 @@ class SentimentModel(BaseModel):
         mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
         model_uri = f"models:/{self.model_name}@production"
         try:
-            self.model = mlflow.pyfunc.load_model(model_uri)
+            # self.model = mlflow.pyfunc.load_model(model_uri)
+            try:
+                self.model = mlflow.sklearn.load_model(model_uri)
+                print("sklearn ------------------")
+            except:
+                self.model = mlflow.pyfunc.load_model(model_uri)
+                print("pyfunc ------------------")
+
             
             # Tính thời gian thực
             load_duration = time.time() - start_time
@@ -165,13 +231,15 @@ class SentimentModel(BaseModel):
             prediction = self.model.predict([text_clean])[0]
             sentiment = self.label_map.get(prediction, str(prediction))
 
-            confidence = 0.5
-            if hasattr(self.model, "predict_proba"):
-                try:
-                    proba_arr = self.model.predict_proba([text_clean])
-                    confidence = float(np.max(proba_arr[0]))
-                except Exception as e:
-                    logger.warning(f"Confidence calc error: {e}")
+            # confidence = 0.5
+            # if hasattr(self.model, "predict_proba"):
+            #     try:
+            #         proba_arr = self.model.predict_proba([text_clean])
+            #         confidence = float(np.max(proba_arr[0]))
+            #     except Exception as e:
+            #         logger.warning(f"Confidence calc error: {e}")
+            confidence = calculate_confidence(self.model, [text_clean], is_batch=False)
+            if confidence is None: confidence = 0.5
             
             record_sentiment_metrics(sentiment, confidence)
             
@@ -232,7 +300,7 @@ class EmailModel(BaseModel):
         mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
         model_uri = f"models:/{self.model_name}@production"
         try:
-            self.model = mlflow.pyfunc.load_model(model_uri)
+            self.model = mlflow.sklearn.load_model(model_uri)
             
             # Tính thời gian thực
             load_duration = time.time() - start_time
@@ -253,13 +321,9 @@ class EmailModel(BaseModel):
             is_spam = bool(prediction == 1)
             label = "spam" if is_spam else "ham"
 
-            confidence = 0.5
-            if hasattr(self.model, "predict_proba"):
-                try:
-                    proba_arr = self.model.predict_proba([text_clean])
-                    confidence = float(np.max(proba_arr[0]))
-                except:
-                    pass
+            # TÍNH CONFIDENCE
+            confidence = calculate_confidence(self.model, [text_clean], is_batch=False)
+            if confidence is None: confidence = 0.5
 
             record_email_metrics(is_spam, confidence)
             
@@ -289,14 +353,14 @@ class EmailModel(BaseModel):
             df['label'] = ["spam" if p == 1 else "ham" for p in predictions]
             df['is_spam'] = [bool(p == 1) for p in predictions]
 
-            if hasattr(self.model, "predict_proba"):
-                try:
-                    probs = self.model.predict_proba(raw_text)
-                    df['confidence'] = np.max(probs, axis=1).round(4)
-                except:
-                    df['confidence'] = 0.5
-            else:
-                df['confidence'] = 0.5
+            # TÍNH CONFIDENCE BATCH
+            confidences = calculate_confidence(self.model, raw_text, is_batch=True)
+            df['confidence'] = np.round(confidences, 4) if confidences is not None else 0.5
+
+            # CẬP NHẬT METRIC CHO TỪNG EMAIL TRONG BATCH
+            # Lặp qua từng dòng kết quả để đẩy metric lên Prometheus
+            for is_spam_val, conf_val in zip(df['is_spam'], df['confidence']):
+                record_email_metrics(is_spam_val, conf_val)
 
             processing_time = time.time() - start_time
             record_batch_processing_metrics("email", len(df), processing_time, True)
@@ -425,6 +489,9 @@ class RecSysModel(BaseModel):
                 clean_preds.append(3.0 if val is None else max(1.0, min(5.0, val)))
             
             df['predicted_rating'] = clean_preds
+            for rating in clean_preds:
+                record_recsys_metrics(rating, is_cold_start=False)
+
             result_df = df[['user_id', 'product_id', 'predicted_rating']]
             
             processing_time = time.time() - start_time

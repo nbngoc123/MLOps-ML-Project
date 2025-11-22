@@ -52,8 +52,8 @@ logs/
 *.tmp
 
 # ===== Environment =====
-.env
-.env.*
+# .env
+# .env.*
 *.local
 
 # ===== Dependencies =====
@@ -66,8 +66,8 @@ coverage/
 
 
 
-mlruns/
-mlflow.db
+# mlruns/
+# mlflow.db
 
 # airflow/dags
 
