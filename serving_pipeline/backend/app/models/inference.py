@@ -345,7 +345,11 @@ class EmailModel(BaseModel):
             content = await file.read()
             df = pd.read_csv(BytesIO(content))
             text_col = next((c for c in ['text', 'content', 'body', 'email'] if c in df.columns), None)
+            date_col = next((c for c in ['date', 'timestamp'] if c in df.columns), None) # KIỂM TRA CỘT DATE
             if not text_col: raise HTTPException(400, "Missing text column")
+
+            if date_col:
+                df['date'] = pd.to_datetime(df[date_col], errors='coerce')
 
             raw_text = df[text_col].astype(str).str.lower().fillna("")
             predictions = self.model.predict(raw_text)

@@ -6,10 +6,8 @@ import httpx
 import asyncio
 import time 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dotenv import load_dotenv
-from utils import analyze_advanced_dashboard
 
 import matplotlib
 matplotlib.use('Agg')
@@ -60,7 +58,155 @@ async def send_csv_batch(endpoint, file_obj):
 # LOGIC DASHBOARD
 # ========================
 
+def analyze_advanced_dashboard(file_rating, file_trend, file_email):
+    """
+    Xử lý phân tích chuyên sâu: Anomaly Detection, Cross-Analysis & Insight Generation
+    """
+    if not file_rating or not file_trend:
+        return [None] * 9 # Trả về rỗng nếu thiếu file quan trọng
 
+    # 1. Load Data
+    try:
+        df_rating = pd.read_csv(file_rating.name)
+        df_trend = pd.read_csv(file_trend.name)
+        # Email là optional, nếu có thì đọc
+        df_email = pd.read_csv(file_email.name) if file_email else pd.DataFrame()
+        
+        # Pre-processing
+        if 'date' in df_trend.columns:
+            df_trend['date'] = pd.to_datetime(df_trend['date'], errors='coerce')
+        
+        # Chuẩn hóa tên cột (tránh lỗi case sensitive)
+        df_rating.columns = [c.lower() for c in df_rating.columns]
+        df_trend.columns = [c.lower() for c in df_trend.columns]
+
+    except Exception as e:
+        return [f"Lỗi đọc file: {str(e)}"] + [None]*8
+
+    # ==========================
+    # A. TREND ANALYSIS (KPIs & Anomaly)
+    # ==========================
+    
+    # 1. Volume theo ngày
+    daily_vol = df_trend.groupby('date')['total_volume'].sum().reset_index()
+    
+    # 2. Anomaly Detection (Phát hiện Spike)
+    # Logic: Ngày nào volume > Mean + 1.5 * StdDev là bất thường
+    vol_mean = daily_vol['total_volume'].mean()
+    vol_std = daily_vol['total_volume'].std()
+    threshold = vol_mean + 1.5 * vol_std
+    
+    df_spikes = daily_vol[daily_vol['total_volume'] > threshold].copy()
+    df_spikes['note'] = '🔥 High Volume Spike'
+    df_spikes = df_spikes.sort_values('total_volume', ascending=False)
+
+    # 3. Top Negative Topics
+    # Tính negative rate: sum(Negative) / sum(Total)
+    topic_stats = df_trend.groupby('topic')[['negative', 'total_volume']].sum().reset_index()
+    topic_stats['neg_rate'] = (topic_stats['negative'] / topic_stats['total_volume']) * 100
+    top_neg_topics = topic_stats.sort_values('neg_rate', ascending=False).head(5)
+
+    # ==========================
+    # B. RATING ANALYSIS
+    # ==========================
+    
+    # 1. Avg Rating per Product
+    prod_stats = df_rating.groupby('product_id')['predicted_rating'].agg(['mean', 'count']).reset_index()
+    prod_stats.columns = ['product_id', 'avg_rating', 'review_count']
+    
+    # 2. Risky Products (Rating < 3.5)
+    risky_products = prod_stats[prod_stats['avg_rating'] < 3.5].sort_values('avg_rating')
+    
+    # 3. User Variance (Optional): Độ lệch chuẩn rating của từng user
+    # (Để xem user nào khó tính hay dễ tính)
+    if 'user_id' in df_rating.columns:
+        user_var = df_rating.groupby('user_id')['predicted_rating'].std().mean()
+    else:
+        user_var = 0
+
+    # ==========================
+    # C. CROSS-INSIGHTS (TỔNG HỢP)
+    # ==========================
+    
+    insights = []
+    insights.append("=== BÁO CÁO PHÂN TÍCH TỔNG HỢP ===")
+    
+    # Insight 1: Tình hình chung
+    avg_r = df_rating['predicted_rating'].mean()
+    avg_n_rate = (df_trend['negative'].sum() / df_trend['total_volume'].sum()) * 100
+    insights.append(f"1. Tổng quan:\n   - Rating trung bình toàn sàn: {avg_r:.2f}/5.0\n   - Tỷ lệ tiêu cực trên mxh/trend: {avg_n_rate:.1f}%")
+    
+    # Insight 2: Mâu thuẫn (Polarization)
+    if avg_r > 4.0 and avg_n_rate > 30:
+        insights.append("⚠️ CẢNH BÁO: Sản phẩm có Rating cao nhưng Thảo luận tiêu cực nhiều -> Có thể là 'Seeding' ảo hoặc Sản phẩm gây tranh cãi.")
+    elif avg_r < 3.0 and avg_n_rate > 50:
+        insights.append("🚨 KHỦNG HOẢNG: Rating thấp và Dư luận rất tiêu cực -> Cần dừng bán hoặc cải tổ sản phẩm ngay.")
+    else:
+        insights.append("✅ Ổn định: Chỉ số Rating và Sentiment tương đồng.")
+
+    # Insight 3: Spike Analysis
+    if not df_spikes.empty:
+        spike_dates = df_spikes['date'].dt.strftime('%Y-%m-%d').tolist()
+        insights.append(f"🔥 Phát hiện bất thường: Có {len(df_spikes)} ngày lượng thảo luận tăng vọt: {', '.join(spike_dates)}. Cần kiểm tra xem là khủng hoảng hay viral tốt.")
+
+    # Insight 4: Vấn đề cụ thể
+    bad_topic = top_neg_topics.iloc[0]
+    insights.append(f"❌ Chủ đề bị phàn nàn nhiều nhất: '{bad_topic['topic']}' (Tỷ lệ tiêu cực: {bad_topic['neg_rate']:.1f}%).")
+
+    # ==========================
+    # D. VISUALIZATION
+    # ==========================
+    
+    # Plot 1: Volume & Spikes (Line Chart)
+    fig_trend = plt.figure(figsize=(10, 5))
+    sns.lineplot(data=daily_vol, x='date', y='total_volume', marker='o', label='Daily Volume')
+    # Vẽ điểm spike
+    if not df_spikes.empty:
+        plt.scatter(df_spikes['date'], df_spikes['total_volume'], color='red', s=100, zorder=5, label='Anomaly (Spike)')
+    plt.title('Xu hướng thảo luận & Điểm bất thường')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Plot 2: Rating Distribution
+    fig_rating = plt.figure(figsize=(6, 5))
+    sns.histplot(df_rating['predicted_rating'], bins=20, kde=True, color='green')
+    plt.axvline(3.5, color='red', linestyle='--', label='Ngưỡng rủi ro (3.5)')
+    plt.title('Phân bố điểm đánh giá')
+    plt.legend()
+    plt.tight_layout()
+
+    # Plot 3: Negative Rate by Topic (Bar Chart)
+    fig_topic = plt.figure(figsize=(8, 5))
+    sns.barplot(data=top_neg_topics, x='neg_rate', y='topic', palette='Reds_r')
+    plt.title('Top Chủ đề có tỷ lệ tiêu cực cao nhất')
+    plt.xlabel('Tỷ lệ tiêu cực (%)')
+    plt.tight_layout()
+
+    # ==========================
+    # E. EXPORT FILES
+    # ==========================
+    
+    # 1. File Insights Text
+    txt_path = os.path.join(GRADIO_TEMP_DIR, f"insights_{int(time.time())}.txt")
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(insights))
+        f.write("\n\n--- CHI TIẾT SẢN PHẨM RỦI RO ---\n")
+        f.write(risky_products.head(20).to_string())
+
+    # 2. File Summary CSV (Gộp Risky Product + Spikes)
+    csv_path = os.path.join(GRADIO_TEMP_DIR, f"summary_analysis_{int(time.time())}.csv")
+    # Chúng ta lưu danh sách sản phẩm rủi ro làm chính
+    risky_products.to_csv(csv_path, index=False, encoding='utf-8-sig')
+
+    return (
+        fig_trend, fig_rating, fig_topic,   # 3 Biểu đồ
+        df_spikes[['date', 'total_volume', 'note']], # Dataframe Spike
+        risky_products.head(10),            # Dataframe Risky Products
+        "\n".join(insights),                # Text Insights hiển thị
+        txt_path,                           # File txt download
+        csv_path                            # File csv download
+    )
     
 # ========================
 # Wrappers & Helpers
@@ -397,113 +543,64 @@ with gr.Blocks(title="NexusML AI Platform", theme=gr.themes.Soft()) as demo:
         # ==========================
         # TAB 6: DASHBOARD BÁO CÁO 
         # ==========================
-
         with gr.Tab("6. 📊 Dashboard Báo Cáo"):
-            gr.Markdown("## Tổng hợp dữ liệu từ 3 nguồn: RecSys, Trend & Email Classification")
+            gr.Markdown("### Tổng hợp dữ liệu từ 3 nguồn: RecSys, Trend & Email Classification")
             
-            # 1. Upload
-            with gr.Accordion("📝 Hướng dẫn Upload Dataset", open=True):
+            # 1. Khu vực Upload
+            with gr.Accordion("📝 Hướng dẫn Upload 3 file dữ liệu nguồn", open=True):
                 gr.Markdown("""
-                • **File Rating:** từ Tab 4 — cần: `product_id`, `predicted_rating`, `date` (optional). 
-                • **File Trend:** từ Tab 5 — cần: `date`, `topic`, `negative`, `positive`, `total_volume`. 
-                • **File Email:** từ Tab 2 — cần: `label`, `is_spam`, `date`. 
-                
+                Để tạo Dashboard, vui lòng upload các file kết quả (`export_...csv`) từ các Tab trước:
+                1. **File Rating:** Kết quả từ Tab 4 (RecSys). Cần cột: `product_id`, `predicted_rating`.
+                2. **File Trend:** Kết quả từ Tab 5 (Trend). Cần cột: `date`, `topic`, `Negative`, `Positive`.
+                3. **File Email:** Kết quả từ Tab 2 (Email). Cần cột: `label`, `is_spam`.
                 """)
-
+            
             with gr.Row():
                 d_file_rate = gr.File(label="1. File Rating (Required)")
                 d_file_trend = gr.File(label="2. File Trend (Required)")
                 d_file_email = gr.File(label="3. File Email (Optional)")
-
+            
             btn_analyze = gr.Button("🚀 Chạy Phân Tích & Tìm Insight", variant="primary")
+        
             gr.Markdown("---")
-
-            # ======================
-            # INSIGHT ZONE
-            # ======================
+            
+            # Khu vực Insights Text
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.Markdown("### 💡 Insight Tự Động Theo Rule Engine")
-                    txt_insights_view = gr.Textbox(label="Insight Summary", lines=12, interactive=False)
-
+                    gr.Markdown("### 💡 Tự động phát hiện Insights")
+                    txt_insights_view = gr.Textbox(label="AI Summary", lines=10, interactive=False)
+                
                 with gr.Column(scale=1):
-                    gr.Markdown("### 📥 Tải Báo Cáo")
-                    # CẬP NHẬT: Thêm dl_pdf và dl_html để nhận các file trả về mới
+                    gr.Markdown("### 📥 Tải báo cáo")
                     dl_txt = gr.File(label="Báo cáo chi tiết (.txt)")
                     dl_csv = gr.File(label="Dữ liệu tổng hợp (.csv)")
-                    dl_pdf = gr.File(label="Báo cáo PDF (Mới)") # <-- MỚI
-                    dl_html = gr.File(label="Báo cáo HTML (Mới)") # <-- MỚI
-                    dl_xlsx = gr.File(label="Báo cáo Excel (.xlsx, nhiều sheet)") # Giữ nguyên nếu bạn có ý định dùng component này sau
 
-            # ======================
-            # VISUALIZATION ZONE
-            # ======================
+            # Khu vực Biểu đồ
             with gr.Tabs():
-                # -------- TREND TAB ----------
-                with gr.TabItem("📈 Trend & Anomaly Detection"):
-                    plot_trend_view = gr.Plot(label="Xu hướng thảo luận & điểm bất thường")
-                    # CẬP NHẬT: Vị trí 3: plot_topic_view (Top Negative Topics) thay thế plot_heatmap_view 
-                    plot_topic_view = gr.Plot(label="Top 10 Chủ đề Tiêu cực") # <-- Sửa tên biến để dễ quản lý outputs
-                    
-                    gr.Markdown("#### 🔥 Các ngày có khách nói nhiều bất thường (Spike Detection)")
+                with gr.TabItem("📈 Trend & Anomalies"):
+                    plot_trend_view = gr.Plot(label="Biểu đồ xu hướng")
+                    gr.Markdown("#### ⚠️ Các ngày có lượng thảo luận tăng đột biến (Spikes)")
                     df_spike_view = gr.DataFrame(label="Danh sách ngày bất thường")
-
-                # -------- RATING TAB ----------
+                
                 with gr.TabItem("⭐ Rating Performance"):
                     with gr.Row():
-                        # CẬP NHẬT: Vị trí 2: plot_rating_view
-                        plot_rating_view = gr.Plot(label="Phân bố điểm Rating") 
-                        # plot_rating_time không được trả về, giữ nguyên hoặc xóa
-                        plot_rating_time = gr.Plot(label="Rating theo thời gian") 
-                    gr.Markdown("#### 🚨 Sản phẩm rủi ro (Rating thấp / Rating giảm)")
-                    # CẬP NHẬT: df_risky_view
-                    df_risky_view = gr.DataFrame(label="Danh sách sản phẩm rủi ro")
-
-                # -------- EMAIL TAB ----------
-                with gr.TabItem("📬 Email Analysis"):
-                    # CẬP NHẬT: Vị trí 4: Biểu đồ phân bố Label mới (fig_email)
-                    plot_email_label_view = gr.Plot(label="Phân bố Chủ đề/Label Email (%)") # <-- MỚI
+                        plot_rating_view = gr.Plot(label="Phân bố điểm")
+                        plot_topic_view = gr.Plot(label="Vấn đề theo Topic")
                     
-                    # Các components không được trả về, giữ nguyên hoặc xóa
-                    plot_email_spam = gr.Plot(label="Spam theo thời gian")
-                    df_email_spike = gr.DataFrame(label="Ngày có spam tăng đột biến")
-                    df_email_topics = gr.DataFrame(label="Nhóm chủ đề email nổi bật")
+                    gr.Markdown("#### 🚨 Danh sách sản phẩm rủi ro (Rating < 3.5)")
+                    df_risky_view = gr.DataFrame(label="Cần kiểm tra gấp")
 
-            # ======================
-            # ACTION: RUN ANALYSIS
-            # ======================
+            # Wiring
             btn_analyze.click(
-                fn=analyze_advanced_dashboard, 
+                fn=analyze_advanced_dashboard,
                 inputs=[d_file_rate, d_file_trend, d_file_email],
                 outputs=[
-                    # 1. fig_trend (Trend & Anomaly)
-                    plot_trend_view, 
-                    # 2. fig_rating (Rating Distribution)
-                    plot_rating_view, 
-                    # 3. fig_topic (Top Negative Topics)
-                    plot_topic_view, 
-                    # 4. fig_email (Email Label Distribution) <--- MỚI, VỊ TRÍ 4
-                    plot_email_label_view, 
-                    
-                    # 5. df_spikes (Spike Detection)
-                    df_spike_view,
-                    # 6. risky_products (Risky Products)
-                    df_risky_view,
-
-                    # 7. insights_text (Insight Summary)
-                    txt_insights_view,
-
-                    # 8. txt_path (Insights TXT)
-                    dl_txt, 
-                    # 9. csv_path (Summary CSV)
-                    dl_csv, 
-                    # 10. pdf_path (Report PDF)
-                    dl_pdf, # <--- MỚI, VỊ TRÍ 10
-                    # 11. html_path (Report HTML)
-                    dl_html # <--- MỚI, VỊ TRÍ 11
-                ] # TỔNG CỘNG 11 OUTPUTS
+                    plot_trend_view, plot_rating_view, plot_topic_view, # Plots
+                    df_spike_view, df_risky_view,                       # Dataframes
+                    txt_insights_view,                                  # Text Insight
+                    dl_txt, dl_csv                                      # Download files
+                ]
             )
-
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860, share=True)
