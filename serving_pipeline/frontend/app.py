@@ -462,7 +462,7 @@ with gr.Blocks(title="NexusML AI Platform", theme=gr.themes.Soft()) as demo:
                 # -------- EMAIL TAB ----------
                 with gr.TabItem("📬 Email Analysis"):
                     # CẬP NHẬT: Vị trí 4: Biểu đồ phân bố Label mới (fig_email)
-                    plot_email_label_view = gr.Plot(label="Phân bố Chủ đề/Label Email (%)") # <-- MỚI
+                    plot_email_label_view = gr.Plot(label="Phân bố Chủ đề/Label Email (%)") 
                     
                     # Các components không được trả về, giữ nguyên hoặc xóa
                     plot_email_spam = gr.Plot(label="Spam theo thời gian")
@@ -482,13 +482,15 @@ with gr.Blocks(title="NexusML AI Platform", theme=gr.themes.Soft()) as demo:
                     plot_rating_view, 
                     # 3. fig_topic (Top Negative Topics)
                     plot_topic_view, 
-                    # 4. fig_email (Email Label Distribution) <--- MỚI, VỊ TRÍ 4
+                    # 4. fig_email (Email Label Distribution) 
                     plot_email_label_view, 
-                    
+                    plot_email_spam,
                     # 5. df_spikes (Spike Detection)
                     df_spike_view,
                     # 6. risky_products (Risky Products)
                     df_risky_view,
+
+                    df_email_spike,
 
                     # 7. insights_text (Insight Summary)
                     txt_insights_view,

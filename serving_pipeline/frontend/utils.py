@@ -179,9 +179,17 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
     # ---------------------
     email_summary = pd.DataFrame()
     email_spam_summary = pd.DataFrame()
+    df_email_topics = pd.DataFrame(columns=['Topic', 'Count'])
     email_insights = []
 
     if not df_email.empty:
+
+        # 1. Chuẩn hóa cột date/timestamp và is_spam
+        date_col_name = next((c for c in df_email.columns if 'date' in c or 'timestamp' in c), None)
+        if date_col_name:
+            df_email['date'] = pd.to_datetime(df_email[date_col_name], errors='coerce')
+            df_email = df_email.dropna(subset=['date'])
+
         # 1. Tóm tắt theo Label
         if 'label' in df_email.columns:
             email_summary = df_email['label'].value_counts(normalize=True).mul(100).round(1).reset_index()
@@ -203,8 +211,24 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
             email_spam_summary = df_email['is_spam'].value_counts().reset_index()
             email_spam_summary.columns = ['Is_Spam', 'Count']
             
-        if 'date' in df_email.columns:
-            df_email['date'] = pd.to_datetime(df_email['date'], errors='coerce')
+        # 3. Phân tích Trend và Spike Spam
+        daily_spam_vol = pd.DataFrame()
+        if 'date' in df_email.columns and 'is_spam' in df_email.columns and not df_email['date'].isnull().all():
+            daily_spam_vol = df_email[df_email['is_spam'] == True].groupby('date', as_index=False).size().rename(columns={'size':'spam_volume'})
+            
+            if not daily_spam_vol.empty:
+                vol_mean = daily_spam_vol['spam_volume'].mean()
+                vol_std = daily_spam_vol['spam_volume'].std()
+                
+                # Tính ngưỡng (ví dụ: trung bình + 1.5 độ lệch chuẩn)
+                threshold = vol_mean + 1.5 * (vol_std if not np.isnan(vol_std) else 0)
+                
+                df_spam_spikes = daily_spam_vol[daily_spam_vol['spam_volume'] > threshold].copy()
+                df_spam_spikes['note'] = '🔥 High Spam Volume Spike'
+                
+                if not df_spam_spikes.empty:
+                    spike_dates = df_spam_spikes['date'].dt.strftime('%Y-%m-%d').tolist()
+                    email_insights.append(f"🚨 Phát hiện spike Spam tại các ngày: {', '.join(spike_dates)}")
 
 
 
@@ -290,6 +314,17 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
             print(f"Lỗi khi tạo biểu đồ Email: {e}")
             fig_email = None # Gán lại None nếu có lỗi
 
+    fig_spam_trend = None
+    if 'daily_spam_vol' in locals() and not daily_spam_vol.empty:
+        fig_spam_trend, ax5 = plt.subplots(figsize=(10,4))
+        sns.lineplot(data=daily_spam_vol, x='date', y='spam_volume', marker='o', ax=ax5)
+        if not df_spam_spikes.empty:
+            ax5.scatter(df_spam_spikes['date'], df_spam_spikes['spam_volume'], color='red', s=80)
+        ax5.set_title('Daily Spam Volume Trend')
+        ax5.set_ylabel('Spam Volume (Count)')
+        ax5.grid(alpha=0.3)
+        fig_spam_trend.tight_layout()
+
     # ---------------------
     # F. Export files
     # ---------------------
@@ -321,6 +356,14 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
         fig_email = plt.figure() 
         plt.close(fig_email)
 
+    # Thêm fig_spam_trend 
+    if fig_spam_trend is not None:
+        figures_to_save.append(fig_spam_trend)
+        image_paths.append(_save_fig(fig_spam_trend, "spam_trend"))
+    else:
+        fig_spam_trend = plt.figure()
+        plt.close(fig_spam_trend)
+
     pdf_path = os.path.join(GRADIO_TEMP_DIR, f"report_{int(time.time())}.pdf")
     with PdfPages(pdf_path) as pdf:
         fig_txt = plt.figure(figsize=(8.27, 11.69))
@@ -337,9 +380,10 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
     img3 = _save_fig(fig_topic, "topic")
     html_path = _create_html_report([img1, img2, img3], insights_text, csv_path)
 
-    return (fig_trend, fig_rating, fig_topic, fig_email,
+    return (fig_trend, fig_rating, fig_topic, fig_email, fig_spam_trend,
             df_spikes[['date','total_volume','note']].reset_index(drop=True),
             risky_products.reset_index(drop=True),
+            df_spam_spikes[['date','spam_volume','note']].reset_index(drop=True),
             insights_text,
             txt_path,
             csv_path,
