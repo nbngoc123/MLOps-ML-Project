@@ -178,57 +178,49 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
     # C. Email KPIs
     # ---------------------
     email_summary = pd.DataFrame()
-    email_spam_summary = pd.DataFrame()
-    df_email_topics = pd.DataFrame(columns=['Topic', 'Count'])
+    df_spam_spikes = pd.DataFrame(columns=['date', 'spam_volume', 'note']) # Default Empty
+    daily_spam_vol = pd.DataFrame() # Default Empty
     email_insights = []
 
     if not df_email.empty:
-
-        # 1. Chuẩn hóa cột date/timestamp và is_spam
+        # 1. Chuẩn hóa Date
         date_col_name = next((c for c in df_email.columns if 'date' in c or 'timestamp' in c), None)
         if date_col_name:
             df_email['date'] = pd.to_datetime(df_email[date_col_name], errors='coerce')
             df_email = df_email.dropna(subset=['date'])
 
-        # 1. Tóm tắt theo Label
+        # 2. Chuẩn hóa Spam Label
+        if 'is_spam' in df_email.columns:
+            df_email['is_spam_bool'] = df_email['is_spam'].astype(str).str.lower().isin(['true', '1'])
+            
+            # Spam Stats
+            total_emails = len(df_email)
+            spam_count = df_email['is_spam_bool'].sum()
+            spam_rate = (spam_count / total_emails * 100) if total_emails > 0 else 0
+            email_insights.append(f"📧 Tỷ lệ Spam: {spam_rate:.1f}%")
+
+            # Spam Trend & Spikes
+            if not df_email['date'].isnull().all():
+                daily_spam_vol = df_email[df_email['is_spam_bool']].groupby('date', as_index=False).size().rename(columns={'size':'spam_volume'})
+                
+                if not daily_spam_vol.empty and daily_spam_vol['spam_volume'].sum() > 0:
+                    s_mean = daily_spam_vol['spam_volume'].mean()
+                    s_std = daily_spam_vol['spam_volume'].std()
+                    s_thresh = s_mean + 1.5 * (s_std if not np.isnan(s_std) else 0)
+                    
+                    found_spikes = daily_spam_vol[daily_spam_vol['spam_volume'] > s_thresh].copy()
+                    if not found_spikes.empty:
+                        found_spikes['note'] = '🔥 High Spam Volume Spike'
+                        df_spam_spikes = found_spikes # Update dataframe
+
+        # 3. Email Label Summary
         if 'label' in df_email.columns:
             email_summary = df_email['label'].value_counts(normalize=True).mul(100).round(1).reset_index()
             email_summary.columns = ['Label', 'Percentage (%)']
-            
-            # Thêm insight
-            top_label = email_summary.iloc[0]['Label']
-            top_pct = email_summary.iloc[0]['Percentage (%)']
-            email_insights.append(f"📦 Nhãn phổ biến nhất: {top_label} ({top_pct:.1f}%)")
-
-        # 2. Tóm tắt theo Spam
-        if 'is_spam' in df_email.columns:
-            df_email['is_spam'] = df_email['is_spam'].astype(str).str.lower()
-            spam_counts = df_email['is_spam'].value_counts()
-            total_emails = spam_counts.sum()
-            spam_rate = spam_counts.get('true', 0) / total_emails * 100
-            email_insights.append(f"📧 Tỷ lệ Spam: {spam_rate:.1f}%")
-            
-            email_spam_summary = df_email['is_spam'].value_counts().reset_index()
-            email_spam_summary.columns = ['Is_Spam', 'Count']
-            
-        # 3. Phân tích Trend và Spike Spam
-        daily_spam_vol = pd.DataFrame()
-        if 'date' in df_email.columns and 'is_spam' in df_email.columns and not df_email['date'].isnull().all():
-            daily_spam_vol = df_email[df_email['is_spam'] == True].groupby('date', as_index=False).size().rename(columns={'size':'spam_volume'})
-            
-            if not daily_spam_vol.empty:
-                vol_mean = daily_spam_vol['spam_volume'].mean()
-                vol_std = daily_spam_vol['spam_volume'].std()
-                
-                # Tính ngưỡng (ví dụ: trung bình + 1.5 độ lệch chuẩn)
-                threshold = vol_mean + 1.5 * (vol_std if not np.isnan(vol_std) else 0)
-                
-                df_spam_spikes = daily_spam_vol[daily_spam_vol['spam_volume'] > threshold].copy()
-                df_spam_spikes['note'] = '🔥 High Spam Volume Spike'
-                
-                if not df_spam_spikes.empty:
-                    spike_dates = df_spam_spikes['date'].dt.strftime('%Y-%m-%d').tolist()
-                    email_insights.append(f"🚨 Phát hiện spike Spam tại các ngày: {', '.join(spike_dates)}")
+            if not email_summary.empty:
+                top_label = email_summary.iloc[0]['Label']
+                top_pct = email_summary.iloc[0]['Percentage (%)']
+                email_insights.append(f"📦 Nhãn phổ biến nhất: {top_label} ({top_pct:.1f}%)")
 
 
 
@@ -268,117 +260,103 @@ def analyze_advanced_dashboard(file_rating, file_trend, file_email=None):
     # ---------------------
     # E. Visualizations
     # ---------------------
+    # 1. Trend Line
     fig_trend, ax = plt.subplots(figsize=(10,4))
     sns.lineplot(data=daily_vol, x='date', y='total_volume', marker='o', ax=ax)
     if not df_spikes.empty:
-        ax.scatter(df_spikes['date'], df_spikes['total_volume'], color='red', s=80)
+        ax.scatter(df_spikes['date'], df_spikes['total_volume'], color='red', s=80, label='Spike')
     ax.set_title('Daily Discussion Volume')
-    ax.set_ylabel('Total Volume')
     ax.grid(alpha=0.3)
     fig_trend.tight_layout()
     
+    # 2. Rating Dist
     fig_rating, ax2 = plt.subplots(figsize=(6,4))
     sns.histplot(df_rating['predicted_rating'].dropna(), bins=20, kde=True, ax=ax2)
-    ax2.axvline(3.5, color='red', linestyle='--', label='Risk threshold 3.5')
+    ax2.axvline(3.5, color='red', linestyle='--', label='Risk threshold')
     ax2.set_title('Rating Distribution')
-    ax2.set_xlabel('Predicted Rating')
-    ax2.legend()
     fig_rating.tight_layout()
 
+    # 3. Topic Bar
     fig_topic, ax3 = plt.subplots(figsize=(8,4))
     plot_df = top_neg_topics.head(10).sort_values('neg_rate')
     sns.barplot(data=plot_df, x='neg_rate', y='topic', ax=ax3)
-    ax3.set_xlabel('Negative Rate (%)')
     ax3.set_title('Top Negative Topics')
     fig_topic.tight_layout()
 
+    # 4. Email Pie (Optional)
     fig_email = None
-    # email_summary phải được tính toán ở phần C. Email KPIs
-    if not email_summary.empty and 'Label' in email_summary.columns and 'Percentage (%)' in email_summary.columns:
+    if not email_summary.empty:
         try:
             fig_email, ax4 = plt.subplots(figsize=(6,4))
             plot_df = email_summary.set_index('Label')['Percentage (%)']
-            
-            # Gom nhóm các nhãn nhỏ (nếu có) để biểu đồ trực quan hơn
-            top_n_labels = plot_df.nlargest(5)
-            others_pct = plot_df[~plot_df.index.isin(top_n_labels.index)].sum()
-            
-            if others_pct > 0:
-                top_n_labels['Others'] = others_pct
-            
-            ax4.pie(top_n_labels, labels=top_n_labels.index, autopct='%1.1f%%', startangle=90, wedgeprops={'edgecolor': 'black'})
-            ax4.set_title('Email/Review Label Distribution (%)')
-            ax4.axis('equal')
+            top_n = plot_df.nlargest(5)
+            others = plot_df[~plot_df.index.isin(top_n.index)].sum()
+            if others > 0: top_n['Others'] = others
+            ax4.pie(top_n, labels=top_n.index, autopct='%1.1f%%', startangle=90)
+            ax4.set_title('Email Label Distribution')
             fig_email.tight_layout()
-        except Exception as e:
-            print(f"Lỗi khi tạo biểu đồ Email: {e}")
-            fig_email = None # Gán lại None nếu có lỗi
+        except: fig_email = None
 
+    # 5. Spam Trend (Optional)
     fig_spam_trend = None
-    if 'daily_spam_vol' in locals() and not daily_spam_vol.empty:
-        fig_spam_trend, ax5 = plt.subplots(figsize=(10,4))
-        sns.lineplot(data=daily_spam_vol, x='date', y='spam_volume', marker='o', ax=ax5)
-        if not df_spam_spikes.empty:
-            ax5.scatter(df_spam_spikes['date'], df_spam_spikes['spam_volume'], color='red', s=80)
-        ax5.set_title('Daily Spam Volume Trend')
-        ax5.set_ylabel('Spam Volume (Count)')
-        ax5.grid(alpha=0.3)
-        fig_spam_trend.tight_layout()
+    if not daily_spam_vol.empty:
+        try:
+            fig_spam_trend, ax5 = plt.subplots(figsize=(10,4))
+            sns.lineplot(data=daily_spam_vol, x='date', y='spam_volume', marker='o', color='orange', ax=ax5)
+            if not df_spam_spikes.empty:
+                ax5.scatter(df_spam_spikes['date'], df_spam_spikes['spam_volume'], color='red', s=80, label='Spike')
+            ax5.set_title('Daily SPAM Volume Trend')
+            ax5.grid(alpha=0.3)
+            fig_spam_trend.tight_layout()
+        except: fig_spam_trend = None
 
     # ---------------------
     # F. Export files
     # ---------------------
     txt_path = os.path.join(GRADIO_TEMP_DIR, f"insights_{int(time.time())}.txt")
     with open(txt_path, "w", encoding="utf-8") as f:
-        f.write(insights_text + "\n\n")
-        f.write("--- Top risk products ---\n")
-        f.write(risky_products.to_string(index=False) if not risky_products.empty else "None\n")
-        f.write("\n\n--- Top negative topics ---\n")
-        f.write(top_neg_topics.to_string(index=False))
+        f.write(insights_text)
 
     csv_path = os.path.join(GRADIO_TEMP_DIR, f"summary_{int(time.time())}.csv")
     risky_products.to_csv(csv_path, index=False, encoding='utf-8-sig')
 
-    # Chuẩn bị danh sách Figures và Image Paths
-    figures_to_save = [fig_trend, fig_rating, fig_topic]
-    image_paths = [
-        _save_fig(fig_trend, "trend"),
-        _save_fig(fig_rating, "rating"),
-        _save_fig(fig_topic, "topic")
-    ]
-
-    # Thêm Figure và Path của Email nếu có
-    if fig_email is not None:
-        figures_to_save.append(fig_email)
-        image_paths.append(_save_fig(fig_email, "email_label"))
-    else:
-        # Nếu fig_email không được tạo, tạo một figure trống để giữ vị trí trong tuple trả về
-        fig_email = plt.figure() 
-        plt.close(fig_email)
-
-    # Thêm fig_spam_trend 
-    if fig_spam_trend is not None:
-        figures_to_save.append(fig_spam_trend)
-        image_paths.append(_save_fig(fig_spam_trend, "spam_trend"))
-    else:
-        fig_spam_trend = plt.figure()
-        plt.close(fig_spam_trend)
-
+    # --- STEP 1: SAVE PDF (While figures are still OPEN) ---
     pdf_path = os.path.join(GRADIO_TEMP_DIR, f"report_{int(time.time())}.pdf")
     with PdfPages(pdf_path) as pdf:
+        # Title Page
         fig_txt = plt.figure(figsize=(8.27, 11.69))
-        fig_txt.text(0.01, 0.99, "Dashboard Report (Rule-based)\n\n", fontsize=14, weight='bold', va='top')
-        fig_txt.text(0.01, 0.95, insights_text, fontsize=10, va='top')
+        fig_txt.text(0.1, 0.9, "Dashboard Report", fontsize=16, weight='bold')
+        fig_txt.text(0.1, 0.8, insights_text, fontsize=10, va='top')
         pdf.savefig(fig_txt)
         plt.close(fig_txt)
+        
+        # Save Charts
         pdf.savefig(fig_trend)
         pdf.savefig(fig_rating)
         pdf.savefig(fig_topic)
+        if fig_email: pdf.savefig(fig_email)
+        if fig_spam_trend: pdf.savefig(fig_spam_trend)
 
-    img1 = _save_fig(fig_trend, "trend")
-    img2 = _save_fig(fig_rating, "rating")
-    img3 = _save_fig(fig_topic, "topic")
-    html_path = _create_html_report([img1, img2, img3], insights_text, csv_path)
+    # --- STEP 2: SAVE PNGs (This CLOSES the figures) ---
+    img_paths = []
+    img_paths.append(_save_fig(fig_trend, "trend"))
+    img_paths.append(_save_fig(fig_rating, "rating"))
+    img_paths.append(_save_fig(fig_topic, "topic"))
+    if fig_email:
+        img_paths.append(_save_fig(fig_email, "email_dist"))
+    if fig_spam_trend:
+        img_paths.append(_save_fig(fig_spam_trend, "spam_trend"))
+
+    # --- STEP 3: HTML REPORT (With ALL images) ---
+    html_path = _create_html_report(img_paths, insights_text, csv_path)
+
+    # Return empty placeholders if figures are None for Gradio compatibility
+    if fig_email is None: 
+        fig_email = plt.figure()
+        plt.close(fig_email)
+    if fig_spam_trend is None:
+        fig_spam_trend = plt.figure()
+        plt.close(fig_spam_trend)
 
     return (fig_trend, fig_rating, fig_topic, fig_email, fig_spam_trend,
             df_spikes[['date','total_volume','note']].reset_index(drop=True),
